@@ -22,7 +22,7 @@ SET NAMES utf8mb4;
 DROP TABLE IF EXISTS tipoproduto, subtipoproduto, romaneio, configsafra, talhao, unidadepessoa, ciclo, produto, safra,
                      contrato, tipocontrato, pessoa, moeda, fixacoescontrato, parcelacontrato,
                      aplictalhao, itensaplictalhao, documento, tipooperacao, parceladocumento,
-                     baixa, itensbaixa, cotacaomoeda,
+                     baixa, itensbaixa, cotacaomoeda, veiculo,
                      simulacao_projetado, simulacao_realizado;
 
 -- Safra: "2024/2025". dataInicial é filtrada (>= 2000-01-01) para barrar
@@ -119,7 +119,30 @@ CREATE TABLE romaneio (
     tipoRomaneio            VARCHAR(40)   NULL,
     canceladoRomaneio       TINYINT       NULL DEFAULT 0,
     codContrato             INT           NULL,   -- nulo na colheita
-    dataLancRomaneio        DATE          NULL
+    dataLancRomaneio        DATE          NULL,
+
+    -- --- só a LISTA de romaneios lê daqui para baixo ---
+    -- O dashboard de Produção soma peso; a lista mostra a carga uma a uma, e
+    -- por isso precisa do documento, da pesagem e de quem levou.
+    numeroRomaneio          INT           NULL,
+    numeroNF                VARCHAR(30)   NULL,
+    dataPesag1Romaneio      DATETIME      NULL,
+    pesoBrutoRomaneio       DECIMAL(14,3) NULL,
+    pesoTaraRomaneio        DECIMAL(14,3) NULL,
+
+    -- Motorista e veículo entram de DOIS jeitos: escolhidos no cadastro
+    -- (codPessoaMotorista / codVeiculo) ou digitados à mão no romaneio. A
+    -- consulta prefere o manual quando ele não está vazio — ler só o cadastro
+    -- deixaria em branco justamente as cargas de frete avulso.
+    codPessoaMotorista      INT           NULL,
+    motoristaManual         VARCHAR(120)  NULL,
+    codVeiculo              INT           NULL,
+    placaManual             VARCHAR(20)   NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE veiculo (
+    codVeiculo   INT PRIMARY KEY,
+    placaVeiculo VARCHAR(20) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------

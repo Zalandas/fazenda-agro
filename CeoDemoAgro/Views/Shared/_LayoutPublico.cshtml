@@ -13,6 +13,15 @@
     @* Mesma versão do _Layout interno: na 6.0.0 faltam ícones usados nos KPIs
        (fa-sack-dollar, fa-money-bill-trend-up, fa-wheat-awn...) e eles saíam em branco. *@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    @* INTER E SORA — as duas famílias que o site.css inteiro declara.
+       Sem este <link> elas nunca chegam, e cada `font-family: 'Inter'` ou
+       `'Sora'` cai calado no system-ui: o mesmo rem, tipo diferente, e o texto
+       parece de outro tamanho porque Segoe UI tem altura-de-x e largura
+       distintas. É o que fazia este demo destoar da tela interna.
+       Mesma linha do _Layout.cshtml interno, com os mesmos pesos. *@
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/css/site.css" />
     <style>
         body {
@@ -101,8 +110,7 @@
 
             /* A faixa branca sangra de ponta a ponta e a arte fica centralizada.
                O respiro vem do padding, e não de margem embutida na imagem: a
-               marca aqui é um SVG sem borda branca, ao contrário do PNG do
-               sistema real, que trazia a sua própria. */
+               marca aqui é um SVG sem borda branca própria. */
             .sidebar-publica .marca {
                 padding: 14px 16px;
             }

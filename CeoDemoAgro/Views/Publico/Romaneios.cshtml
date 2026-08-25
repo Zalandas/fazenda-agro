@@ -1,0 +1,181 @@
+@model IEnumerable<CeoManager.Models.RomaneioViewModel>
+@{
+    Layout = "_LayoutPublico";
+    ViewBag.Titulo = "Romaneios";
+    ViewBag.AbaAtiva = "producao";
+    ViewBag.SubAba = "romaneios";
+    var token = ViewBag.Token as string;
+}
+
+<div class="d-flex justify-content-between align-items-center gap-2 mb-3 flex-wrap">
+    <div>
+        <div style="font-size:.7rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--green-700)">Relatório</div>
+        <h1 class="mb-0" style="font-size:1.4rem;font-weight:800;color:var(--ink)">Romaneios de Colheita</h1>
+    </div>
+</div>
+
+<partial name="_AbasProducao" />
+
+@if (ViewBag.ErroBanco != null)
+{
+    <div class="nota-agro is-perigo mb-3">
+        <div class="nota-agro-titulo"><i class="fa-solid fa-triangle-exclamation me-2"></i> Falha de conexão</div>
+        <div class="nota-agro-corpo">@ViewBag.ErroBanco</div>
+    </div>
+}
+
+<!-- Filtros -->
+<div class="card-agro filtros-agro mb-3">
+    <div class="card-body">
+        <form method="get" action="/p/romaneios/@token">
+            <div class="row g-3 align-items-end">
+
+                <div class="col-6 col-md-2">
+                    <label class="form-label fw-bold mb-1" style="color:var(--ink)"><i class="fa-solid fa-calendar-days me-1" style="color:var(--green-600)"></i> Safra:</label>
+                    <select name="safra" class="form-select form-select-sm fw-bold shadow-none" onchange="this.form.submit()">
+                        @* <option value="">-- Todas --</option> *@
+                        @if (ViewBag.SafrasDisponiveis != null)
+                        {
+                            foreach (var s in ViewBag.SafrasDisponiveis)
+                            {
+                                <option value="@s" selected="@(s == (string)ViewBag.SafraSelecionada)">@s</option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="col-6 col-md-2">
+                    <label class="form-label fw-bold mb-1" style="color:var(--ink)"><i class="fa-solid fa-rotate me-1" style="color:var(--green-600)"></i> Ciclo:</label>
+                    <select name="ciclo" class="form-select form-select-sm fw-bold shadow-none" onchange="this.form.submit()">
+                        <option value="">-- Todos --</option>
+                        @if (ViewBag.CiclosDisponiveis != null)
+                        {
+                            foreach (var c in ViewBag.CiclosDisponiveis)
+                            {
+                                <option value="@c" selected="@(c == (string)ViewBag.CicloSelecionado)">@c</option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="col-6 col-md-3">
+                    <label class="form-label fw-bold mb-1" style="color:var(--ink)"><i class="fa-solid fa-tractor me-1" style="color:var(--green-600)"></i> Fazenda:</label>
+                    <select name="fazenda" class="form-select form-select-sm fw-bold shadow-none" onchange="this.form.submit()">
+                        <option value="">-- Todas --</option>
+                        @if (ViewBag.FazendasDisponiveis != null)
+                        {
+                            foreach (var f in ViewBag.FazendasDisponiveis)
+                            {
+                                <option value="@f" selected="@(f == (string)ViewBag.FazendaSelecionada)">@f</option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="col-6 col-md-2">
+                    <label class="form-label fw-bold mb-1" style="color:var(--ink)"><i class="fa-solid fa-seedling me-1" style="color:var(--green-600)"></i> Cultura:</label>
+                    <select name="cultura" class="form-select form-select-sm fw-bold shadow-none" onchange="this.form.submit()">
+                        <option value="">-- Todas --</option>
+                        @if (ViewBag.CulturasDisponiveis != null)
+                        {
+                            foreach (var cu in ViewBag.CulturasDisponiveis)
+                            {
+                                <option value="@cu" selected="@(cu == (string)ViewBag.CulturaSelecionada)">@cu</option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="col-6 col-md-3">
+                    <label class="form-label fw-bold mb-1" style="color:var(--ink)"><i class="fa-solid fa-map-location-dot me-1" style="color:var(--green-600)"></i> Talhão:</label>
+                    <div class="d-flex gap-2">
+                        <select name="talhao" class="form-select form-select-sm fw-bold shadow-none" onchange="this.form.submit()">
+                            <option value="">-- Todos --</option>
+                            @if (ViewBag.TalhoesDisponiveis != null)
+                            {
+                                foreach (var tl in ViewBag.TalhoesDisponiveis)
+                                {
+                                    <option value="@tl" selected="@(tl == (string)ViewBag.TalhaoSelecionado)">@tl</option>
+                                }
+                            }
+                        </select>
+                        <a href="/p/romaneios/@token" class="btn btn-sm btn-agro-outline d-flex align-items-center">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabela -->
+<div class="card-agro">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title fs-5 m-0 fw-bold" style="color:var(--ink)">
+            <i class="fa-solid fa-truck-ramp-box me-2" style="color:var(--green-600)"></i> Lista de Romaneios
+            <span class="badge bg-success ms-2">@Model.Count()</span>
+        </h3>
+    </div>
+    <div class="card-body table-responsive p-0" style="max-height: 600px;">
+        <table class="table table-sm table-hover table-head-fixed text-nowrap table-agro">
+            <thead>
+                <tr class="text-center align-middle">
+                    <th class="text-start ps-3">Nº ROMANEIO</th>
+                    <th>DATA</th>
+                    <th class="text-start">FAZENDA</th>
+                    <th>TALHÃO</th>
+                    <th class="text-start">CULTURA</th>
+                    <th class="text-end">BRUTO (KG)</th>
+                    <th class="text-end">TARA (KG)</th>
+                    <th class="text-end">LÍQUIDO (KG)</th>
+                    <th class="text-end">SACAS</th>
+                    <th class="text-start">MOTORISTA</th>
+                    <th class="pe-3">PLACA</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="11" class="text-center py-4" style="color:var(--muted)">Nenhum romaneio encontrado para os filtros selecionados.</td></tr>
+                }
+                @foreach (var r in Model)
+                {
+                    <tr class="align-middle">
+                        <td class="fw-bold ps-3 text-center" style="color:var(--green-700)">@(r.NumeroRomaneio?.ToString() ?? "—")</td>
+                        <td class="text-center" style="color:var(--ink-2)">@(r.DataPesagem?.ToString("dd/MM/yyyy") ?? "—")</td>
+                        <td class="fw-semibold" style="color:var(--ink)">@r.Fazenda</td>
+                        <td class="text-center"><span class="talhao-badge">@r.Talhao</span></td>
+                        <td style="color:var(--ink-2)">@r.Cultura</td>
+                        <td class="text-end" style="color:var(--muted)">@r.PesoBruto.ToString("N2")</td>
+                        <td class="text-end" style="color:var(--muted)">@r.PesoTara.ToString("N2")</td>
+                        <td class="text-end fw-bold" style="color:var(--ink)">@r.PesoLiquido.ToString("N2")</td>
+                        <td class="text-end sc-cell">@r.Sacas.ToString("N2")</td>
+                        <td style="color:var(--ink-2)">@(string.IsNullOrEmpty(r.Motorista) ? "—" : r.Motorista)</td>
+                        <td class="text-center pe-3" style="color:var(--ink-2)">@(string.IsNullOrEmpty(r.Placa) ? "—" : r.Placa)</td>
+                    </tr>
+                }
+            </tbody>
+            @if (Model.Any())
+            {
+                <tfoot>
+                    @{
+                        decimal totBruto = Model.Sum(x => x.PesoBruto);
+                        decimal totTara = Model.Sum(x => x.PesoTara);
+                        decimal totLiquido = Model.Sum(x => x.PesoLiquido);
+                        decimal totSacas = Model.Sum(x => x.Sacas);
+                    }
+                    <tr class="align-middle tabela-total">
+                        <td colspan="5" class="text-end pe-3 fw-bold" style="color:var(--ink)">TOTAIS (@Model.Count() romaneios)</td>
+                        <td class="text-end" style="color:var(--muted)">@totBruto.ToString("N2")</td>
+                        <td class="text-end" style="color:var(--muted)">@totTara.ToString("N2")</td>
+                        <td class="text-end fw-bold" style="color:var(--ink)">@totLiquido.ToString("N2")</td>
+                        <td class="text-end sc-cell">@totSacas.ToString("N2")</td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            }
+        </table>
+    </div>
+</div>

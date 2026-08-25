@@ -274,6 +274,106 @@ namespace CeoDemoAgro.Controllers
             return View(listaFiltrada);
         }
 
+        // ============================================================
+        // LISTA PÚBLICA DE ROMANEIOS (mesmo token do dashboard)
+        //
+        // É a segunda aba da Produção: o dashboard soma o peso, esta lista mostra
+        // carga por carga. Mesmos filtros de colheita do dashboard — o par
+        // 'Colheita' + 'Entrada' —, então as duas abas contam a mesma história.
+        //
+        // O detalhe que só dado real ensina está no motorista e na placa: o ERP
+        // deixa escolher do cadastro OU digitar à mão, e o COALESCE/NULLIF/TRIM
+        // prefere o manual quando ele tem conteúdo. Ler só o cadastro deixaria
+        // em branco justamente as cargas de frete avulso.
+        // ============================================================
+        [HttpGet("p/romaneios/{token}")]
+        public async Task<IActionResult> Romaneios(string token, string safra = "2024/2025",
+            string ciclo = "", string fazenda = "", string cultura = "", string talhao = "")
+        {
+            var (ok, connStringERP, nomeCliente) = ResolverToken(token);
+            if (!ok)
+                return Content("Este link é inválido ou foi desativado pelo administrador.");
+
+            ViewBag.NomeCliente = nomeCliente;
+            ViewBag.Token = token;
+
+            var lista = new List<RomaneioViewModel>();
+
+            if (!string.IsNullOrEmpty(connStringERP))
+            {
+                string sqlMysql = @"
+                    SELECT
+                        r.codRomaneio AS CodRomaneio,
+                        r.numeroRomaneio AS NumeroRomaneio,
+                        r.numeroNF AS NumeroNF,
+                        r.dataPesag1Romaneio AS DataPesagem,
+                        UPPER(TRIM(u.nomeUnidPessoa)) AS Fazenda,
+                        UPPER(TRIM(t.nomeTalhao)) AS Talhao,
+                        UPPER(TRIM(p.nomeProduto)) AS Cultura,
+                        UPPER(TRIM(s.nomeSafra)) AS Safra,
+                        UPPER(TRIM(c.nomeCiclo)) AS Ciclo,
+                        COALESCE(r.pesoBrutoRomaneio, 0.0) AS PesoBruto,
+                        COALESCE(r.pesoTaraRomaneio, 0.0) AS PesoTara,
+                        COALESCE(r.pesoLiqRomaneio, 0.0) AS PesoLiquido,
+                        COALESCE(NULLIF(TRIM(r.motoristaManual), ''), pm.nomePessoa) AS Motorista,
+                        COALESCE(NULLIF(TRIM(r.placaManual), ''), v.placaVeiculo) AS Placa
+                    FROM romaneio r
+                    LEFT JOIN safra s          ON r.codSafra = s.codSafra
+                    LEFT JOIN talhao t         ON r.codTalhao = t.codTalhao
+                    LEFT JOIN unidadepessoa u  ON r.codUnidadePessoaFaz = u.codUnidPessoa
+                    LEFT JOIN ciclo c          ON r.codCiclo = c.codCiclo
+                    LEFT JOIN produto p        ON r.codProdutoCultura = p.codProduto
+                    LEFT JOIN veiculo v        ON r.codVeiculo = v.codVeiculo
+                    LEFT JOIN pessoa pm        ON r.codPessoaMotorista = pm.codPessoa
+                    WHERE COALESCE(r.canceladoRomaneio, 0) = 0
+                      AND r.tipoEntSaiRomaneio LIKE 'COLHEITA%'
+                      AND r.tipoRomaneio LIKE 'ENTRADA%'
+                      AND s.dataInicial >= '2000-01-01'
+                      AND t.nomeTalhao IS NOT NULL AND TRIM(t.nomeTalhao) <> ''
+                      AND p.nomeProduto IS NOT NULL AND TRIM(p.nomeProduto) <> ''
+                    ORDER BY r.dataPesag1Romaneio DESC, r.numeroRomaneio DESC";
+
+                try
+                {
+                    using (var mySqlConn = new MySqlConnection(connStringERP))
+                    {
+                        lista = (await mySqlConn.QueryAsync<RomaneioViewModel>(sqlMysql)).ToList();
+                    }
+                }
+                catch (MySqlException)
+                {
+                    ViewBag.ErroBanco = "Não foi possível carregar os romaneios no momento. Tente novamente em instantes.";
+                }
+                catch (Exception)
+                {
+                    ViewBag.ErroBanco = "Ocorreu um erro inesperado ao buscar os dados.";
+                }
+            }
+
+            // Popula dropdowns (todas as opções, antes de filtrar)
+            ViewBag.SafrasDisponiveis = lista.Select(x => x.Safra).Where(x => !string.IsNullOrEmpty(x)).Distinct().OrderByDescending(x => x).ToList();
+            ViewBag.CiclosDisponiveis = lista.Select(x => x.Ciclo).Where(x => !string.IsNullOrEmpty(x)).Distinct().OrderBy(x => x).ToList();
+            ViewBag.FazendasDisponiveis = lista.Select(x => x.Fazenda).Where(x => !string.IsNullOrEmpty(x)).Distinct().OrderBy(x => x).ToList();
+            ViewBag.CulturasDisponiveis = lista.Select(x => x.Cultura).Where(x => !string.IsNullOrEmpty(x)).Distinct().OrderBy(x => x).ToList();
+            ViewBag.TalhoesDisponiveis = lista.Select(x => x.Talhao).Where(x => !string.IsNullOrEmpty(x)).Distinct().OrderBy(x => x).ToList();
+
+            // Aplica filtros em memória
+            var query = lista.AsQueryable();
+            if (!string.IsNullOrEmpty(safra)) query = query.Where(x => x.Safra == safra);
+            if (!string.IsNullOrEmpty(ciclo)) query = query.Where(x => x.Ciclo == ciclo);
+            if (!string.IsNullOrEmpty(fazenda)) query = query.Where(x => x.Fazenda == fazenda);
+            if (!string.IsNullOrEmpty(cultura)) query = query.Where(x => x.Cultura == cultura);
+            if (!string.IsNullOrEmpty(talhao)) query = query.Where(x => x.Talhao == talhao);
+
+            ViewBag.SafraSelecionada = safra;
+            ViewBag.CicloSelecionado = ciclo;
+            ViewBag.FazendaSelecionada = fazenda;
+            ViewBag.CulturaSelecionada = cultura;
+            ViewBag.TalhaoSelecionado = talhao;
+
+            return View(query.ToList());
+        }
+
         /// <summary>
         /// A tela pública de Contratos de venda. Como a de Produção, o corpo é cópia literal da
         /// action correspondente do CeoManager — a consulta inteira, com os três casos que só

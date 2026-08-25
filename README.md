@@ -1,15 +1,16 @@
 # BI agrícola — demonstração
 
-As quatro telas de BI agrícola do portal — **Produção**, **Contratos de venda**, **Insumos** e
-**Quadro de Safras** — rodando contra um banco de dados **fictício**, com as mesmas consultas e as
-mesmas regras de cálculo do sistema em produção.
+As quatro telas de BI agrícola do portal — **Produção** (com a aba de **Romaneios**),
+**Contratos de venda**, **Insumos** e **Quadro de Safras** — rodando contra um banco de dados
+**fictício**, com as mesmas consultas e as mesmas regras de cálculo do sistema em produção.
 
 ```
 docker compose up -d          # MySQL com o esquema e a fazenda de exemplo
 dotnet run --project CeoDemoAgro
 ```
 
-Depois, abra <http://localhost:5290>.
+Depois, abra <http://localhost:5290> — a raiz redireciona para a tela de Produção já com o token
+do `appsettings.json`, então não é preciso montar a URL à mão.
 
 ---
 
