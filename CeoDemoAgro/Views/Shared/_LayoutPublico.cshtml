@@ -207,24 +207,18 @@
             {
                 <div class="cliente-nome">@ViewBag.NomeCliente</div>
             }
-            @* O portal do sistema real tem quatro telas. Esta demonstração traz UMA, e o menu
-               mostra só ela: item que leva a 404 não é promessa do que vem, é defeito à vista.
-               As outras entram aqui quando existirem. *@
+            @* O portal do sistema real tem quatro telas. Esta demonstração traz as que já
+               existem, e o menu mostra só elas: item que leva a 404 não é promessa do que vem,
+               é defeito à vista. Insumos e Quadro de Safras entram quando existirem. *@
             <ul class="nav-pub">
-                <li><a class="active" href="/p/producao/@token"><i class="fa-solid fa-chart-column"></i> Produção</a></li>
+                <li><a class="@(ativa == "producao" ? "active" : "")" href="/p/producao/@token"><i class="fa-solid fa-chart-column"></i> Produção</a></li>
+                <li><a class="@(ativa == "contratos" ? "active" : "")" href="/p/contratos/@token"><i class="fa-solid fa-file-signature"></i> Contratos</a></li>
             </ul>
 
-            @* --- menu original, para quando as outras telas vierem ---
-            @if (false)
-            {
-                <ul class="nav-pub">
-                    <li><a class="@(ativa == "producao" ? "active" : "")" href="/p/producao/@token"><i class="fa-solid fa-chart-column"></i> Produção</a></li>
-                    <li><a class="@(ativa == "contratos" ? "active" : "")" href="/p/contratos/@token"><i class="fa-solid fa-file-signature"></i> Contratos</a></li>
-                    <li><a class="@(ativa == "insumos" ? "active" : "")" href="/p/insumos/@token"><i class="fa-solid fa-flask"></i> Insumos</a></li>
-                    <li><a class="@(ativa == "quadro" ? "active" : "")" href="/p/quadro/@token"><i class="fa-solid fa-table-list"></i> Quadro de Safras</a></li>
-                </ul>
-            }
-            --- fim do menu original *@
+            @* --- as que faltam, para quando vierem ---
+            <li><a class="@(ativa == "insumos" ? "active" : "")" href="/p/insumos/@token"><i class="fa-solid fa-flask"></i> Insumos</a></li>
+            <li><a class="@(ativa == "quadro" ? "active" : "")" href="/p/quadro/@token"><i class="fa-solid fa-table-list"></i> Quadro de Safras</a></li>
+            --- *@
         </aside>
 
         <div class="area-conteudo">
@@ -266,13 +260,12 @@
             document.querySelector('.layout-publico').classList.add('sidebar-recolhida');
         }
 
-        // PWA: só registra em contexto seguro (HTTPS/localhost); em HTTP falharia no console.
-        if ('serviceWorker' in navigator && window.isSecureContext) {
-            window.addEventListener('load', function () {
-                navigator.serviceWorker.register('/sw-portal.js', { scope: '/p/' })
-                    .catch(function (err) { console.log('SW portal falhou:', err); });
-            });
-        }
+        // O sistema real registra aqui um service worker (/sw-portal.js) que torna o portal
+        // instalável no celular do cliente. Esta demonstração não serve esse arquivo, e o
+        // registro ficava tentando: em localhost isSecureContext é TRUE, então a condição
+        // passava e o console colecionava "unknown error when fetching the script" a cada
+        // visita. Foi a mesma sobra do <link rel="manifest">, e escapou pelo mesmo motivo —
+        // remover metade de um PWA deixa a outra metade batendo em 404 sem quebrar a tela.
     </script>
     @RenderSection("Scripts", required: false)
 </body>

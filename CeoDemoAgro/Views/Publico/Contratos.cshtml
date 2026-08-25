@@ -1,0 +1,293 @@
+﻿@model IEnumerable<CeoManager.Models.ContratoBiViewModel>
+@{
+    Layout = "_LayoutPublico";
+    ViewBag.Titulo = "Contratos";
+    ViewBag.AbaAtiva = "contratos";
+}
+
+<div class="d-flex justify-content-between align-items-center gap-2 mb-3 flex-wrap">
+    <div>
+        <div style="font-size:.7rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--green-700)">Relatório</div>
+        <h1 class="mb-0" style="font-size:1.4rem;font-weight:800;color:var(--ink)">Contratos — Safra @(ViewBag.SafraSelecionada ?? "Atual")</h1>
+    </div>
+</div>
+
+@if (ViewBag.ErroBanco != null)
+{
+    <div class="nota-agro is-perigo mb-3">
+        <div class="nota-agro-titulo"><i class="fa-solid fa-triangle-exclamation me-2"></i> Falha de conexão</div>
+        <div class="nota-agro-corpo">@ViewBag.ErroBanco</div>
+    </div>
+}
+
+<!-- Filtros -->
+<div class="card-agro filtros-agro mb-3">
+    <div class="card-body">
+        <form method="get">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label fw-bold mb-1" style="color:var(--ink)">
+                        <i class="fa-solid fa-calendar-days me-1" style="color:var(--green-600)"></i> Safra:
+                    </label>
+                    <select name="safra" class="form-select form-select-sm fw-bold shadow-none" onchange="this.form.submit()">
+                        @foreach (var s in ViewBag.SafrasDisponiveis)
+                        {
+                            <option value="@s" selected="@(s == ViewBag.SafraSelecionada)">@s</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label fw-bold mb-1" style="color:var(--ink)">
+                        <i class="fa-solid fa-seedling me-1" style="color:var(--green-600)"></i> Cultura:
+                    </label>
+                    <select name="cultura" class="form-select form-select-sm fw-bold shadow-none" onchange="this.form.submit()">
+                        <option value="">-- Todas --</option>
+                        @foreach (var c in ViewBag.CulturasDisponiveis)
+                        {
+                            <option value="@c" selected="@(c == ViewBag.CulturaSelecionada)">@c</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label fw-bold mb-1" style="color:var(--ink)">
+                        <i class="fa-solid fa-handshake me-1" style="color:var(--green-600)"></i> Cliente:
+                    </label>
+                    <div class="d-flex gap-2">
+                        <select name="cliente" class="form-select form-select-sm fw-bold shadow-none" onchange="this.form.submit()">
+                            <option value="">-- Todos --</option>
+                            @foreach (var cli in ViewBag.ClientesDisponiveis)
+                            {
+                                <option value="@cli" selected="@(cli == ViewBag.ClienteSelecionado)">@cli</option>
+                            }
+                        </select>
+                        @if (!string.IsNullOrEmpty(ViewBag.SafraSelecionada as string) || !string.IsNullOrEmpty(ViewBag.CulturaSelecionada as string) || !string.IsNullOrEmpty(ViewBag.ClienteSelecionado as string))
+                        {
+                            <a href="/p/contratos/@ViewBag.Token" class="btn btn-sm btn-agro-outline d-flex align-items-center">
+                                <i class="fa-solid fa-rotate-left me-1"></i> Limpar
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- KPIs + Gráficos -->
+<div class="row align-items-stretch row-main-dashboard">
+    <div class="col-lg-3 col-md-4 mb-3">
+        <div class="row h-100 row-metrics">
+            <div class="col-12 mb-2">
+                <div class="kpi kpi-1 h-100">
+                    <div class="d-flex justify-content-between align-items-center w-100">
+                        <div><h4>@ViewBag.TotalSacas.ToString("N0") <span>SC</span></h4><p>Volume Total</p></div>
+                        <div class="kpi-ic"><i class="fa-solid fa-seedling"></i></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 mb-2">
+                <div class="kpi kpi-2 h-100">
+                    <div class="d-flex justify-content-between align-items-center w-100">
+                        <div><h4>@ViewBag.TotalEntregue.ToString("N0") <span>SC</span></h4><p>Vol. Entregue</p></div>
+                        <div class="kpi-ic"><i class="fa-solid fa-truck-fast"></i></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="kpi kpi-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center w-100">
+                        <div><h4>@ViewBag.SaldoEntregar.ToString("N0") <span>SC</span></h4><p>Saldo Pendente</p></div>
+                        <div class="kpi-ic"><i class="fa-solid fa-scale-balanced"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 col-md-8 mb-3">
+        <div class="card-agro h-100 m-0" style="display: flex; flex-direction: column;">
+            <div class="card-header py-2">
+                <h3 class="card-title fs-6 m-0 fw-bold" style="color:var(--ink)"><i class="fa-solid fa-chart-pie me-2" style="color:var(--green-600)"></i> Top Clientes (Vol.)</h3>
+            </div>
+            <div class="card-body p-2" style="position: relative; flex: 1 1 auto; min-height: 230px;">
+                <canvas id="graficoClientes"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5 col-12 mb-3">
+        <div class="card-agro h-100 m-0" style="display: flex; flex-direction: column;">
+            <div class="card-header py-2">
+                <h3 class="card-title fs-6 m-0 fw-bold" style="color:var(--ink)"><i class="fa-solid fa-chart-column me-2" style="color:var(--green-600)"></i> Receita Total (R$) por Cultura</h3>
+            </div>
+            <div class="card-body p-2" style="position: relative; flex: 1 1 auto; min-height: 230px;">
+                <canvas id="graficoCulturas"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card-agro">
+            <div class="card-header py-3">
+                <h3 class="card-title fs-5 m-0 fw-bold" style="color:var(--ink)">
+                    <i class="fa-solid fa-table me-2" style="color:var(--green-600)"></i> Detalhamento de Contratos
+                </h3>
+            </div>
+            <div class="card-body table-responsive p-0" style="max-height: 500px;">
+                <table class="table table-sm table-hover table-head-fixed text-nowrap table-agro">
+                    <thead>
+                        <tr class="text-center align-middle">
+                            <th>SAFRA</th>
+                            <th>CULTURA</th>
+                            <th>CONTRATO</th>
+                            <th class="text-start">CLIENTE</th>
+                            <th>TIPO</th>
+                            <th>MOEDA</th>
+                            <th class="text-end">QNT SC</th>
+                            <th class="text-end">PREÇO USD</th>
+                            <th class="text-end">TOTAL USD</th>
+                            <th class="text-end">PREÇO R$</th>
+                            <th class="text-end">TOTAL R$</th>
+                            <th>DATA EMISSÃO</th>
+                            <th>DATA ENTREGA</th>
+                            <th>DATA PGTO</th>
+                            <th>FRETE</th>
+                            <th class="text-end">SAÍDA SC</th>
+                            <th class="text-end">ENTRADA SC</th>
+                            <th class="text-end">SALDO SC</th>
+                            <th>STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Any())
+                        {
+                            <tr><td colspan="19" class="text-center py-4" style="color:var(--muted)">Nenhum contrato para os filtros aplicados.</td></tr>
+                        }
+                        @foreach (var item in Model)
+                        {
+                            <tr class="align-middle">
+                                <td class="text-center" style="color:var(--ink-2)">@item.SAFRA</td>
+                                <td style="color:var(--ink-2)">@item.CULTURA</td>
+                                <td class="text-center"><span class="talhao-badge">@item.CONTRATO</span></td>
+                                <td class="fw-bold" style="color:var(--ink)">@item.CLIENTE</td>
+                                <td class="text-center" style="color:var(--ink-2)">@item.TIPO</td>
+                                <td class="text-center" style="color:var(--ink-2)">@item.MOEDA</td>
+                                <td class="text-end sc-cell">@item.QNT_SC.ToString("N2")</td>
+                                <td class="text-end" style="color:var(--green-600)">@(item.PRECO_USD?.ToString("C2", new System.Globalization.CultureInfo("en-US")) ?? "-")</td>
+                                <td class="text-end prod-cell">@(item.TOTAL_USD?.ToString("C2", new System.Globalization.CultureInfo("en-US")) ?? "-")</td>
+                                <td class="text-end" style="color:var(--ink-2)">@item.PRECO_RS.ToString("C2", new System.Globalization.CultureInfo("pt-BR"))</td>
+                                <td class="text-end sc-cell">@item.TOTAL_RS.ToString("C2", new System.Globalization.CultureInfo("pt-BR"))</td>
+                                <td class="text-center" style="color:var(--ink-2)">@(item.DATA_EMISSAO?.ToString("dd/MM/yyyy") ?? "-")</td>
+                                <td class="text-center" style="color:var(--ink-2)">@(item.DATA_ENTREGA?.ToString("dd/MM/yyyy") ?? "-")</td>
+                                <td class="text-center" style="color:var(--ink-2)">@(item.DATA_PGTO?.ToString("dd/MM/yyyy") ?? "-")</td>
+                                <td class="text-center" style="color:var(--ink-2)">@item.FRETE</td>
+                                <td class="text-end" style="color:var(--danger);font-weight:600">@item.SAIDA_SC.ToString("N2")</td>
+                                <td class="text-end prod-cell">@item.ENTRADA_SC.ToString("N2")</td>
+                                <td class="text-end sc-cell">@item.SALDO_SC.ToString("N2")</td>
+                                <td class="text-center">
+                                    <span class="status-agro @(item.STATUS == "FINALIZADO" ? "is-ok" : "is-pendente")">@item.STATUS</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        @{
+                            decimal totQnt = Model.Sum(x => x.QNT_SC);
+                            decimal totRs = Model.Sum(x => x.TOTAL_RS);
+                            decimal totSaida = Model.Sum(x => x.SAIDA_SC);
+                            decimal totEntrada = Model.Sum(x => x.ENTRADA_SC);
+                            decimal totSaldo = Model.Sum(x => x.SALDO_SC);
+                        }
+                        <tr class="align-middle tabela-total">
+                            <td colspan="6" class="text-end pe-2 fw-bold" style="color:var(--ink)">TOTAIS</td>
+                            <td class="text-end sc-cell">@totQnt.ToString("N2")</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-end sc-cell">@totRs.ToString("C2", new System.Globalization.CultureInfo("pt-BR"))</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-end" style="color:var(--danger);font-weight:700">@totSaida.ToString("N2")</td>
+                            <td class="text-end prod-cell">@totEntrada.ToString("N2")</td>
+                            <td class="text-end sc-cell">@totSaldo.ToString("N2")</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        Chart.defaults.color = '#6b7f72';
+        Chart.defaults.borderColor = '#e6ede8';
+        Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+
+        function barraGradiente(context) {
+            var chart = context.chart, area = chart.chartArea;
+            if (!area) { return '#1a8552'; }
+            var g = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+            g.addColorStop(0, '#4cc088'); g.addColorStop(1, '#146c43');
+            return g;
+        }
+
+        new Chart(document.getElementById('graficoClientes').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: @Html.Raw(Json.Serialize(ViewBag.ChartClientesNomes)),
+                datasets: [{
+                    data: @Html.Raw(Json.Serialize(ViewBag.ChartClientesVolumes)),
+                    backgroundColor: ['#0b3d2c', '#146c43', '#1a8552', '#27a366', '#4cc088'],
+                    borderColor: '#ffffff', borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '55%', layout: { padding: 10 },
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, padding: 15 } },
+                    tooltip: { backgroundColor: '#0b3d2c', padding: 12, cornerRadius: 10 }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('graficoCulturas').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: @Html.Raw(Json.Serialize(ViewBag.ChartCulturasNomes)),
+                datasets: [{
+                    label: 'Faturamento R$',
+                    data: @Html.Raw(Json.Serialize(ViewBag.ChartCulturasReceitas)),
+                    backgroundColor: barraGradiente, hoverBackgroundColor: '#0b3d2c',
+                    borderWidth: 0, borderRadius: 7, borderSkipped: false, barPercentage: 0.6
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10, bottom: 0 } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0b3d2c', padding: 12, cornerRadius: 10,
+                        callbacks: { label: function(c) { return 'R$ ' + (c.raw || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); } }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+                    y: {
+                        beginAtZero: true, grid: { color: 'rgba(11,61,44,0.06)' },
+                        ticks: {
+                            font: { size: 10 },
+                            callback: function(v) { if (v >= 1000000) return (v/1000000).toFixed(1)+'M'; if (v >= 1000) return (v/1000).toFixed(0)+'K'; return v; }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+}

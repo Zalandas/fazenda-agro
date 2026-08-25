@@ -269,5 +269,156 @@ namespace CeoDemoAgro.Controllers
 
             return View(listaFiltrada);
         }
+
+        /// <summary>
+        /// A tela pública de Contratos de venda. Como a de Produção, o corpo é cópia literal da
+        /// action correspondente do CeoManager — a consulta inteira, com os três casos que só
+        /// aparecem em dado real: o peso que vale (origem ou destino) sendo decisão do CONTRATO
+        /// e não do romaneio, o preço em reais vindo das FIXAÇÕES quando a moeda é outra, e a
+        /// remessa que parece entrega mas não é.
+        ///
+        /// A única alteração é a mesma: de onde vem a string de conexão.
+        /// </summary>
+        [HttpGet("p/contratos/{token}")]
+        public async Task<IActionResult> Contratos(string token, string safra = "2024/2025",
+            string cultura = "", string cliente = "")
+        {
+            var (ok, connString, nomeCliente) = ResolverToken(token);
+            if (!ok)
+                return Content("Este link é inválido ou foi desativado pelo administrador.");
+
+            ViewBag.NomeCliente = nomeCliente;
+            ViewBag.Token = token;
+
+            var contratos = new List<ContratoBiViewModel>();
+
+            if (!string.IsNullOrEmpty(connString))
+            {
+                string sql = @"
+            SELECT
+                UPPER(s.nomeSafra) AS SAFRA,
+                UPPER(prod.nomeProduto) AS CULTURA,
+                TRIM(COALESCE(c.contratoContrato, c.contrato)) AS CONTRATO,
+                UPPER(tc.nomeTipoContrato) AS TIPO,
+                UPPER(pes.nomePessoa) AS CLIENTE,
+                UPPER(COALESCE(m.nomeMoeda, 'REAL')) AS MOEDA,
+                (COALESCE(c.qtdContrato, 0.0) / 60.0) AS QNT_SC,
+                CASE WHEN m.codMoeda IS NOT NULL AND UPPER(m.nomeMoeda) <> 'REAL' THEN (COALESCE(c.precoUnitAlt, 0.0) * 60.0) ELSE NULL END AS PRECO_USD,
+                CASE WHEN m.codMoeda IS NOT NULL AND UPPER(m.nomeMoeda) <> 'REAL' THEN COALESCE(c.valorAlt, COALESCE(c.qtdContrato, 0.0) * COALESCE(c.precoUnitAlt, 0.0), 0.0) ELSE NULL END AS TOTAL_USD,
+                CASE
+                    WHEN m.codMoeda IS NOT NULL AND UPPER(m.nomeMoeda) <> 'REAL'
+                    THEN (COALESCE(f.totalValor / NULLIF(f.totalQuantidade, 0), c.precoContrato, 0.0) * 60.0)
+                    ELSE (COALESCE(c.precoContrato, 0.0) * 60.0)
+                END AS PRECO_RS,
+                CASE
+                    WHEN m.codMoeda IS NOT NULL AND UPPER(m.nomeMoeda) <> 'REAL'
+                    THEN (COALESCE(c.qtdContrato, 0.0) * COALESCE(f.totalValor / NULLIF(f.totalQuantidade, 0), c.precoContrato, 0.0))
+                    ELSE (COALESCE(c.qtdContrato, 0.0) * COALESCE(c.precoContrato, 0.0))
+                END AS TOTAL_RS,
+                DATE(c.dataLancContrato) AS DATA_EMISSAO,
+                DATE(r.maxDataEntrega) AS DATA_ENTREGA,
+                DATE(p.primeiraDataParcela) AS DATA_PGTO,
+                CASE WHEN c.tipoFrete = '0' THEN 'CIF' WHEN c.tipoFrete = '1' THEN 'FOB' ELSE UPPER(c.tipoFrete) END AS FRETE,
+                (CASE
+                    WHEN UPPER(TRIM(COALESCE(c.controlePeso, ''))) LIKE '%DESTINO%' THEN COALESCE(r.saidaDestino, 0.0)
+                    ELSE COALESCE(r.saidaOrigem, 0.0)
+                 END / 60.0) AS SAIDA_SC,
+                (CASE
+                    WHEN UPPER(TRIM(COALESCE(c.controlePeso, ''))) LIKE '%DESTINO%' THEN COALESCE(r.entradaDestino, 0.0)
+                    ELSE COALESCE(r.entradaOrigem, 0.0)
+                 END / 60.0) AS ENTRADA_SC,
+                ((COALESCE(c.qtdContrato, 0.0) -
+                    CASE WHEN UPPER(TRIM(COALESCE(c.controlePeso, ''))) LIKE '%DESTINO%' THEN COALESCE(r.saidaDestino, 0.0) ELSE COALESCE(r.saidaOrigem, 0.0) END
+                    +
+                    CASE WHEN UPPER(TRIM(COALESCE(c.controlePeso, ''))) LIKE '%DESTINO%' THEN COALESCE(r.entradaDestino, 0.0) ELSE COALESCE(r.entradaOrigem, 0.0) END
+                 ) / 60.0) AS SALDO_SC,
+                CASE
+                    WHEN UPPER(TRIM(COALESCE(c.status, ''))) = 'FINALIZADO' THEN 'FINALIZADO'
+                    WHEN (COALESCE(c.qtdContrato, 0.0) -
+                        CASE WHEN UPPER(TRIM(COALESCE(c.controlePeso, ''))) LIKE '%DESTINO%' THEN COALESCE(r.saidaDestino, 0.0) ELSE COALESCE(r.saidaOrigem, 0.0) END
+                        +
+                        CASE WHEN UPPER(TRIM(COALESCE(c.controlePeso, ''))) LIKE '%DESTINO%' THEN COALESCE(r.entradaDestino, 0.0) ELSE COALESCE(r.entradaOrigem, 0.0) END
+                    ) <= 0 THEN 'FINALIZADO'
+                    ELSE 'PENDENTE'
+                END AS STATUS
+            FROM contrato c
+                LEFT JOIN safra s ON c.codSafra = s.codSafra
+                LEFT JOIN tipocontrato tc ON c.codTipoContrato = tc.codTipoContrato
+                LEFT JOIN pessoa pes ON c.codPessoaCliente = pes.codPessoa
+                LEFT JOIN produto prod ON c.codProdutoCultura = prod.codProduto
+                LEFT JOIN moeda m ON c.codMoedaAlt = m.codMoeda
+                LEFT JOIN (SELECT codContrato, SUM(quantidade) AS totalQuantidade, SUM(valor) AS totalValor FROM fixacoescontrato GROUP BY codContrato) f ON c.codContrato = f.codContrato
+                LEFT JOIN (
+                    SELECT
+                        codContrato,
+                        MAX(dataLancRomaneio) AS maxDataEntrega,
+                        SUM(CASE WHEN UPPER(COALESCE(tipoRomaneio,'')) LIKE '%SAIDA%' THEN COALESCE(pesoLiqRomaneio, 0) ELSE 0 END) AS saidaOrigem,
+                        SUM(CASE WHEN UPPER(COALESCE(tipoRomaneio,'')) LIKE '%SAIDA%' THEN COALESCE(pesoLiqDestinoRomaneio, 0) ELSE 0 END) AS saidaDestino,
+                        SUM(CASE WHEN UPPER(COALESCE(tipoRomaneio,'')) LIKE '%ENTRADA%' THEN COALESCE(pesoLiqRomaneio, 0) ELSE 0 END) AS entradaOrigem,
+                        SUM(CASE WHEN UPPER(COALESCE(tipoRomaneio,'')) LIKE '%ENTRADA%' THEN COALESCE(pesoLiqDestinoRomaneio, 0) ELSE 0 END) AS entradaDestino
+                    FROM romaneio
+                    WHERE (canceladoRomaneio = 0 OR canceladoRomaneio IS NULL)
+                      AND UPPER(COALESCE(tipoEntSaiRomaneio, '')) NOT LIKE '%REMESSA%'
+                    GROUP BY codContrato
+                ) r ON c.codContrato = r.codContrato
+                LEFT JOIN (SELECT codContrato, MIN(vencimentoParcela) AS primeiraDataParcela FROM parcelacontrato GROUP BY codContrato) p ON c.codContrato = p.codContrato
+            WHERE UPPER(COALESCE(c.status, '')) <> 'CANCELADO'
+              AND UPPER(tc.nomeTipoContrato) LIKE '%VENDA%'
+              AND s.dataInicial >= '2000-01-01'";
+
+                try
+                {
+                    using (var conn = new MySqlConnection(connString))
+                    {
+                        contratos = (await conn.QueryAsync<ContratoBiViewModel>(sql)).ToList();
+                    }
+                }
+                catch (MySqlException)
+                {
+                    ViewBag.ErroBanco = "Não foi possível carregar os contratos do sistema de origem. Tente novamente em instantes.";
+                }
+            }
+
+            var query = contratos.AsQueryable();
+
+            if (!string.IsNullOrEmpty(safra))
+                query = query.Where(c => c.SAFRA == safra);
+
+            ViewBag.CulturasDisponiveis = query.Select(c => c.CULTURA).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
+            if (!string.IsNullOrEmpty(cultura))
+                query = query.Where(c => c.CULTURA == cultura);
+
+            ViewBag.ClientesDisponiveis = query.Select(c => c.CLIENTE).Where(c => !string.IsNullOrEmpty(c)).Distinct().OrderBy(c => c).ToList();
+            if (!string.IsNullOrEmpty(cliente))
+                query = query.Where(c => c.CLIENTE == cliente);
+
+            var contratosFiltrados = query.ToList();
+
+            ViewBag.SafrasDisponiveis = contratos.Select(c => c.SAFRA).Distinct().OrderByDescending(s => s).ToList();
+            ViewBag.SafraSelecionada = safra;
+            ViewBag.CulturaSelecionada = cultura;
+            ViewBag.ClienteSelecionado = cliente;
+
+            ViewBag.TotalSacas = contratosFiltrados.Sum(c => c.QNT_SC);
+            // Espelho da tela interna: entregue líquido = saídas − entradas (devoluções)
+            ViewBag.TotalEntregue = contratosFiltrados.Sum(c => c.SAIDA_SC - c.ENTRADA_SC);
+            ViewBag.SaldoEntregar = contratosFiltrados.Sum(c => c.SALDO_SC);
+
+            var topClientes = contratosFiltrados
+                .GroupBy(c => c.CLIENTE)
+                .Select(g => new { Cliente = g.Key, Volume = g.Sum(c => c.QNT_SC) })
+                .OrderByDescending(x => x.Volume).Take(5).ToList();
+            ViewBag.ChartClientesNomes = topClientes.Select(c => c.Cliente).ToList();
+            ViewBag.ChartClientesVolumes = topClientes.Select(c => c.Volume).ToList();
+
+            var receitaPorCultura = contratosFiltrados
+                .GroupBy(c => c.CULTURA)
+                .Select(g => new { Cultura = string.IsNullOrEmpty(g.Key) ? "NÃO DEFINIDA" : g.Key, ReceitaTotal = g.Sum(c => c.TOTAL_RS) })
+                .OrderByDescending(x => x.ReceitaTotal).ToList();
+            ViewBag.ChartCulturasNomes = receitaPorCultura.Select(c => c.Cultura).ToList();
+            ViewBag.ChartCulturasReceitas = receitaPorCultura.Select(c => c.ReceitaTotal).ToList();
+
+            return View(contratosFiltrados);
+        }
     }
 }
