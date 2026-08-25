@@ -104,6 +104,13 @@ VALUES
 --    SOJA    330 ha  20.250 sc   61,3636 sc/ha
 --    MILHO   100 ha  11.000 sc  110,0000 sc/ha
 --
+--  O 06-dados-quadro.sql acrescenta um sexto plantio — BRAQUIÁRIA, 50 ha no
+--  T-04, sem colheita — de que o Quadro de Safras precisa. Com ele carregado
+--  esta tela passa a mostrar 480 ha PLANTADOS contra 430 COLHIDOS (89,6%), e
+--  as duas produtividades deixam de coincidir: 65,10 sc/ha geral (sobre a
+--  área plantada) e 72,67 sc/ha colhida (sobre a colhida). A produção não
+--  muda, e nenhum número da soja muda.
+--
 --  A SOJA é o teste que importa. A média das três produtividades por
 --  talhão — (60 + 63 + 60) / 3 — dá 61,00, e está ERRADA. A conta certa
 --  é Σsacas ÷ Σárea = 20.250 / 330 = 61,3636. Se a tela mostrar 61,00,

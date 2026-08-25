@@ -19,7 +19,10 @@
 SET NAMES utf8mb4;
 
 DROP TABLE IF EXISTS romaneio, configsafra, talhao, unidadepessoa, ciclo, produto, safra,
-                     contrato, tipocontrato, pessoa, moeda, fixacoescontrato, parcelacontrato;
+                     contrato, tipocontrato, pessoa, moeda, fixacoescontrato, parcelacontrato,
+                     aplictalhao, itensaplictalhao, documento, tipooperacao, parceladocumento,
+                     baixa, itensbaixa, cotacaomoeda,
+                     simulacao_projetado, simulacao_realizado;
 
 -- Safra: "2024/2025". dataInicial é filtrada (>= 2000-01-01) para barrar
 -- linha-lixo com ano absurdo, que a base real tem.
@@ -154,8 +157,124 @@ CREATE TABLE fixacoescontrato (
     valor        DECIMAL(16,2) NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- saldoAltParcela é o saldo do contrato AINDA NÃO FATURADO — e o ERP **não o
+-- abate** ao emitir a nota: parcela 100% paga mantém o saldo cheio. Quem
+-- desconta é a consulta do preço médio, subtraindo o que já virou documento.
+-- Sem isso, contrato faturado conta duas vezes.
 CREATE TABLE parcelacontrato (
-    codParcela         INT PRIMARY KEY,
-    codContrato        INT  NOT NULL,
-    vencimentoParcela  DATE NULL
+    codParcela           INT PRIMARY KEY,
+    codContrato          INT           NOT NULL,
+    vencimentoParcela    DATE          NULL,
+    saldoAltParcela      DECIMAL(16,2) NULL,
+    codMoedaAltParcela   INT           NULL   -- 2 = dólar; converte pela cotação
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------------------
+--  TELA DE QUADRO DE SAFRAS
+--
+--  Duas famílias de tabela entram aqui: o CUSTO aplicado por talhão, e o
+--  faturamento (notas e baixas) de que sai o PREÇO MÉDIO realizado.
+-- ---------------------------------------------------------------------
+
+-- Custo: uma aplicação por (safra, cultura) com seus itens.
+CREATE TABLE aplictalhao (
+    codAplicTalhao     INT PRIMARY KEY,
+    codSafra           INT NULL,
+    codProdutoCultura  INT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE itensaplictalhao (
+    codItAplicTalhao    INT PRIMARY KEY,
+    codAplicTalhao      INT           NOT NULL,
+    valorItAplicTalhao  DECIMAL(16,2) NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- A NOTA. `historicoDoc` contendo 'ADIANTAMENTO' tira o documento do termo (1)
+-- do preço médio: é o mesmo dinheiro que a nota quita por encontro de contas, e
+-- contá-lo dobraria o contrato.
+CREATE TABLE documento (
+    codDoc         INT PRIMARY KEY,
+    valorDoc       DECIMAL(16,2) NULL,
+    codTipoOper    INT           NULL,
+    historicoDoc   VARCHAR(200)  NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Devolução de venda entra no preço médio com o SINAL INVERTIDO; é o
+-- nomeTipoOper que a identifica.
+CREATE TABLE tipooperacao (
+    codTipoOper   INT PRIMARY KEY,
+    nomeTipoOper  VARCHAR(80) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- A ponte entre nota e contrato. As DUAS colunas de parcela existem porque o
+-- vínculo pode ser com a parcela normal (codParcelaC) ou com a de adiantamento
+-- (codParcelaCAdt) — a consulta aceita qualquer uma.
+CREATE TABLE parceladocumento (
+    codParcela           INT PRIMARY KEY,
+    codDocumento         INT           NOT NULL,
+    codParcelaC          INT           NULL,
+    codParcelaCAdt       INT           NULL,
+    valorPrincParcela    DECIMAL(16,2) NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Acréscimos e descontos do faturamento vêm da BAIXA, não da nota: a nota
+-- guarda o valor de face.
+CREATE TABLE baixa (
+    codBaixa        INT PRIMARY KEY,
+    canceladaBaixa  TINYINT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE itensbaixa (
+    codItBaixa                INT PRIMARY KEY,
+    codBaixa                  INT           NOT NULL,
+    codParcelaDocumento       INT           NOT NULL,
+    acrescimoPrincItBaixa     DECIMAL(16,2) NULL,
+    descontoPrincItBaixa      DECIMAL(16,2) NULL,
+    retencao                  TINYINT       NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- A cotação tem LINHA-LIXO com ano absurdo na base real, e pegar "a mais
+-- recente" sem teto zerava a conversão. Por isso a consulta exige
+-- dataCotMoeda <= CURDATE().
+CREATE TABLE cotacaomoeda (
+    codCotacao     INT PRIMARY KEY,
+    codMoeda       INT           NOT NULL,
+    dataCotMoeda   DATE          NULL,
+    valor          DECIMAL(16,6) NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------------------
+--  AS SIMULAÇÕES — o "Projetado" contra o qual o realizado é comparado.
+--
+--  No sistema real estas duas tabelas vivem no SQL Server do CeoManager, e
+--  não no ERP do cliente: são trabalho da consultoria, não dado do ERP.
+--  Aqui elas estão no MESMO MySQL, para o demo não exigir dois bancos —
+--  é a segunda (e última) diferença em relação ao original, e está
+--  anotada também na action.
+-- ---------------------------------------------------------------------
+CREATE TABLE simulacao_projetado (
+    id                INT PRIMARY KEY,
+    cliente           VARCHAR(120)  NULL,
+    safra             VARCHAR(60)   NULL,
+    cultura           VARCHAR(80)   NULL,
+    areaPlantada      DECIMAL(14,4) NULL,
+    areaColhida       DECIMAL(14,4) NULL,
+    produtividade     DECIMAL(14,4) NULL,
+    precoMedio        DECIMAL(14,4) NULL,
+    custoProducaoHa   DECIMAL(14,4) NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Mesma forma. Fica VAZIA de propósito: uma linha aqui SOBRESCREVE os números
+-- que vieram do ERP, e um demo cujo número não vem do dado que ele mostra
+-- perde a graça. Ver o comentário no 06-dados-quadro.sql.
+CREATE TABLE simulacao_realizado (
+    id                INT PRIMARY KEY,
+    cliente           VARCHAR(120)  NULL,
+    safra             VARCHAR(60)   NULL,
+    cultura           VARCHAR(80)   NULL,
+    areaPlantada      DECIMAL(14,4) NULL,
+    areaColhida       DECIMAL(14,4) NULL,
+    produtividade     DECIMAL(14,4) NULL,
+    precoMedio        DECIMAL(14,4) NULL,
+    custoProducaoHa   DECIMAL(14,4) NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,7 +1,8 @@
 # BI agrícola — demonstração
 
-Duas telas de BI agrícola — **Produção** e **Contratos de venda** — rodando contra um banco de
-dados **fictício**, com as mesmas consultas e as mesmas regras de cálculo do sistema em produção.
+Três telas de BI agrícola — **Produção**, **Contratos de venda** e **Quadro de Safras** — rodando
+contra um banco de dados **fictício**, com as mesmas consultas e as mesmas regras de cálculo do
+sistema em produção.
 
 ```
 docker compose up -d          # MySQL com o esquema e a fazenda de exemplo
@@ -71,6 +72,7 @@ valores foram escolhidos para que **o erro e o acerto deem resultados diferentes
 | T-01 | Milho | 100 ha | 11.000 | 110,00 | a segunda safra que não pode vazar |
 | T-02 | Soja | 150 ha | 9.450 | 63,00 | dois cultivares, exige reagregar |
 | T-03 | Soja | 80 ha | 4.800 | 60,00 | só um romaneio órfão, resgatado |
+| T-04 | Braquiária | 50 ha | 0 | 0 | pastagem: área e custo sem colheita |
 
 Filtrando por soja, a tela mostra **61,36 sc/ha** — que é `20.250 ÷ 330`.
 
@@ -102,13 +104,36 @@ regra, se quebrada, mude o resultado de um jeito visível:
 Os KPIs fecham entre si: **15.000 contratados − 12.240 entregues = 2.760 a entregar**. Se os
 três não fecharem, a devolução entrou de um lado só.
 
+### E no quadro de safras
+
+Aqui a conta é margem por cultura, e ela depende do preço médio — a parte mais escorregadia do
+sistema. O valor de um contrato tem **dois termos que não podem se sobrepor**: as notas já
+emitidas, e o saldo ainda não faturado. O que torna isso difícil é que **o ERP não abate o saldo
+ao faturar**: a parcela paga continua com o saldo cheio, e somar os dois ingenuamente conta o
+mesmo grão duas vezes.
+
+| Se o preço da soja vier | O que quebrou |
+|---|---|
+| 179,78 | o saldo não foi abatido pelo que já virou nota — 50% de inflação |
+| 129,78 | o adiantamento entrou como receita (é o mesmo dinheiro, por encontro de contas) |
+| 120,54 | o adiantamento não foi descontado do saldo, deixando resíduo fantasma |
+| 122,24 | a devolução somou em vez de subtrair |
+| **119,784** | **certo** |
+
+E o milho a 68,40 em vez de 70,80 denuncia outra coisa: a cotação do dólar foi buscada sem teto
+de data, e veio a linha com **ano 3905** que a base real tem.
+
+O quadro também mostra por que **braquiária fica fora por padrão**. É pastagem: ocupa 50 ha,
+consome R$ 60 mil de custo e não produz saca nenhuma. Marcando o checkbox, a receita bruta não
+muda em um centavo e a margem operacional cai de **158,4% para 146,5%**.
+
 ---
 
 ## O que este projeto NÃO é
 
-**Não é o sistema.** São duas telas dele, com dados inventados. O sistema real sincroniza vários
-clientes, resolve escopo por grupo e empresa, controla acesso, e o portal tem quatro telas mais
-todo um lado financeiro. Nada disso está aqui.
+**Não é o sistema.** São três telas dele, com dados inventados. O sistema real sincroniza vários
+clientes, resolve escopo por grupo e empresa, controla acesso, e o portal tem uma quarta tela
+mais todo um lado financeiro. Nada disso está aqui.
 
 **Não é um dashboard de exemplo.** A consulta e o pós-processamento são cópia literal do que
 roda em produção, sem simplificação. Uma versão enxuta seria mais fácil de ler e não provaria
@@ -127,13 +152,16 @@ aparecem aqui nem disfarçados.
 
 ```
 banco/
-  01-esquema.sql               13 tabelas — o recorte do ERP que estas telas leem
+  01-esquema.sql               23 tabelas — o recorte do ERP que estas telas leem
   02-dados.sql                 a fazenda fictícia, com os valores esperados
   03-conferencia.sql           a consulta de Produção, para rodar direto no MySQL
   04-dados-contratos.sql       a carteira fictícia, com os valores esperados
   05-conferencia-contratos.sql a consulta de Contratos
+  06-dados-quadro.sql          custo, faturamento e a simulação projetada
+  07-conferencia-quadro.sql    as duas consultas do Quadro de Safras
 CeoDemoAgro/
   Controllers/          as actions, cópia das que estão em produção
+  Services/             o cálculo do preço médio, cópia
   Views/Publico/        as telas, cópia
   Views/Shared/         o layout do portal, cópia
 docker-compose.yml      MySQL 8 na porta 3307, seed na primeira subida
@@ -144,10 +172,18 @@ O esquema é **um arquivo só** porque as telas compartilham tabelas: `safra`, `
 Produção é colheita, nos Contratos é entrega —, e separar o esquema por tela obrigaria a
 decidir de quem ele é.
 
-A **única** diferença em relação ao sistema real é de onde vem a string de conexão. Em produção
-o token está numa tabela e leva a um identificador de grupo, que nomeia a string
-`ClienteConnection_{id}`. Aqui o token e o grupo estão no `appsettings.json`, e o resto do
-caminho é o mesmo — inclusive o nome da string. O corpo da action não tem uma linha alterada.
+São **duas** as diferenças em relação ao sistema real, e só duas.
+
+A primeira é de onde vem a string de conexão. Em produção o token está numa tabela e leva a um
+identificador de grupo, que nomeia a string `ClienteConnection_{id}`. Aqui o token e o grupo
+estão no `appsettings.json`, e o resto do caminho é o mesmo — inclusive o nome da string.
+
+A segunda vale só para o Quadro de Safras: as tabelas de simulação (o "Projetado") vivem, em
+produção, no SQL Server do sistema, porque são trabalho da consultoria e não dado do ERP. Aqui
+estão no mesmo MySQL, para o demo não exigir dois bancos — muda o tipo da conexão e o
+`'%' + @cliente + '%'` do SQL Server, que em MySQL é `CONCAT`.
+
+Fora isso, o corpo das actions não tem uma linha alterada.
 
 ### Sem Docker
 

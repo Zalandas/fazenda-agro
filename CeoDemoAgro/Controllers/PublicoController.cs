@@ -1,4 +1,8 @@
 using CeoManager.Models;
+// O serviço do preço médio veio copiado com o namespace do original — CeoManager.Services —,
+// porque renomear namespace é a primeira alteração que faz "cópia literal" deixar de ser
+// verdade. O demo importa; não reescreve.
+using CeoManager.Services;
 using Dapper;
 using Microsoft.AspNetCore.Mvc;
 using MySqlConnector;
@@ -419,6 +423,199 @@ namespace CeoDemoAgro.Controllers
             ViewBag.ChartCulturasReceitas = receitaPorCultura.Select(c => c.ReceitaTotal).ToList();
 
             return View(contratosFiltrados);
+        }
+
+        /// <summary>
+        /// O Quadro de Safras: o PROJETADO da consultoria contra o REALIZADO que sai do ERP,
+        /// cultura a cultura, com área, produtividade, custo por hectare, preço médio e margem.
+        ///
+        /// Esta é a tela com mais regra escondida das três, e a que mais depende de dado real:
+        /// a área COLHIDA não é a plantada (uma faixa de cultivar só conta se tiver romaneio
+        /// próprio ou estiver fechada no ERP), o custo vem das aplicações por talhão, e o preço
+        /// médio sai de <see cref="PrecoMedioService"/>, que soma nota faturada e saldo de
+        /// contrato ainda não faturado sem que os dois se sobreponham.
+        ///
+        /// DUAS diferenças em relação ao original, não uma:
+        ///
+        /// 1. a string de conexão, como nas outras telas;
+        /// 2. as tabelas de simulação. No sistema real elas vivem no SQL Server do CeoManager
+        ///    (MasterConnection) — são trabalho da consultoria, não dado do ERP —, e aqui estão
+        ///    no mesmo MySQL para o demo não exigir dois bancos. Só muda o tipo da conexão e o
+        ///    `'%' + @cliente + '%'` do SQL Server, que em MySQL é CONCAT.
+        ///
+        /// Some daqui o ramo "cliente sem ERP", que no original lê safras e culturas do cadastro
+        /// interno quando o grupo não tem banco de origem: aqui há sempre conexão, e manter um
+        /// caminho que nunca executa seria código que ninguém pode conferir.
+        /// </summary>
+        [HttpGet("p/quadro/{token}")]
+        public async Task<IActionResult> Quadro(string token, string safra = "2024/2025",
+            bool incluirBraquiaria = false)
+        {
+            var (ok, connString, nomeCliente) = ResolverToken(token);
+            if (!ok)
+                return Content("Este link é inválido ou foi desativado pelo administrador.");
+
+            string clienteAtual = nomeCliente;
+            ViewBag.NomeCliente = clienteAtual;
+            ViewBag.Token = token;
+            ViewBag.IncluirBraquiaria = incluirBraquiaria;
+
+            var model = new QuadroSafraViewModel
+            {
+                SafraSelecionada = safra,
+                SafrasDisponiveis = new List<string>(),
+                CulturasRealizadas = new List<CulturaRealizada>(),
+                SimulacoesSalvas = new List<CulturaProjetada>()
+            };
+
+            if (!string.IsNullOrEmpty(connString))
+            {
+                string sqlMysql = @"
+            SELECT
+                s.nomeSafra AS Safra,
+                UPPER(TRIM(p.nomeProduto)) AS NomeCultura,
+                SUM(COALESCE(cs.areaPrevistaConfigSafra, 0.0)) AS AreaPlantada,
+                -- Área COLHIDA real, por FAIXA de cultivar (romaneio próprio, com ciclo e
+                -- cultivar amarrados, ou fechada no ERP) — espelho do QuadroSafraController;
+                -- toda correção lá deve ser replicada aqui.
+                SUM(CASE WHEN COALESCE(cs.fechaColheitaConfigSafra, 0) = 1
+                           OR EXISTS (
+                               SELECT 1
+                               FROM romaneio rc
+                               WHERE rc.codSafra = cs.codSafra
+                                 AND rc.codUnidadePessoaFaz = cs.codUnidPessoaFaz
+                                 AND rc.codTalhao = cs.codTalhao
+                                 AND rc.codProdutoCultura = cs.codProdutoCultura
+                                 AND rc.codCiclo = cs.codCiclo
+                                 AND rc.codProdutoCultivar = cs.codProdutoCultivar
+                                 AND rc.tipoEntSaiRomaneio LIKE 'COLHEITA%'
+                                 AND rc.tipoRomaneio LIKE 'ENTRADA%'
+                                 AND COALESCE(rc.canceladoRomaneio, 0) = 0
+                           )
+                         THEN COALESCE(cs.areaPrevistaConfigSafra, 0.0) ELSE 0.0 END) AS AreaColhida,
+                COALESCE((
+                    SELECT SUM(COALESCE(itap.valorItAplicTalhao, 0.0))
+                    FROM itensaplictalhao itap
+                    JOIN aplictalhao ap ON itap.codAplicTalhao = ap.codAplicTalhao
+                    WHERE ap.codSafra = cs.codSafra AND ap.codProdutoCultura = cs.codProdutoCultura
+                ), 0.0) AS CustoTotal,
+                COALESCE((
+                    SELECT SUM(COALESCE(r.pesoLiqRomaneio, 0.0)) / 60.0
+                    FROM romaneio r
+                    WHERE r.codSafra = cs.codSafra AND r.codProdutoCultura = cs.codProdutoCultura
+                      AND r.tipoEntSaiRomaneio LIKE 'COLHEITA%'
+                      AND r.tipoRomaneio LIKE 'ENTRADA%'
+                      AND COALESCE(r.canceladoRomaneio, 0) = 0
+                ), 0.0) AS ProducaoSacas
+                FROM configsafra cs
+                LEFT JOIN safra s ON cs.codSafra = s.codSafra
+                LEFT JOIN produto p ON cs.codProdutoCultura = p.codProduto
+                WHERE s.dataInicial >= '2000-01-01' AND p.nomeProduto IS NOT NULL
+                GROUP BY s.nomeSafra, p.nomeProduto, cs.codSafra, cs.codProdutoCultura";
+
+                try
+                {
+                    using (var mySqlConn = new MySqlConnection(connString))
+                    {
+                        var baseDados = (await mySqlConn.QueryAsync<CulturaRealizada>(sqlMysql)).ToList();
+
+                        model.SafrasDisponiveis = baseDados
+                            .Select(x => x.Safra).Where(s => !string.IsNullOrEmpty(s))
+                            .Distinct().OrderByDescending(s => s).ToList();
+
+                        model.CulturasRealizadas = baseDados.Where(x => x.Safra == safra).ToList();
+                    }
+                }
+                catch (MySqlException)
+                {
+                    ViewBag.ErroBanco = "Não foi possível carregar o Quadro de Safras no momento.";
+                }
+            }
+
+            // Simulações salvas (Projetado e Realizado). No original isto abre uma
+            // SqlConnection contra o MasterConnection; aqui é o mesmo MySQL, e o
+            // `'%' + @cliente + '%'` do SQL Server vira CONCAT.
+            try
+            {
+                using (var simConn = new MySqlConnection(connString))
+                {
+                    var projetado = await simConn.QueryAsync<CulturaProjetada>(
+                        "SELECT * FROM simulacao_projetado WHERE safra = @safra AND cliente LIKE CONCAT('%', @cliente, '%')",
+                        new { safra, cliente = clienteAtual });
+                    model.SimulacoesSalvas = projetado.ToList();
+
+                    var realizado = await simConn.QueryAsync<CulturaProjetada>(
+                        "SELECT * FROM simulacao_realizado WHERE safra = @safra AND cliente LIKE CONCAT('%', @cliente, '%')",
+                        new { safra, cliente = clienteAtual });
+
+                    foreach (var salva in realizado)
+                    {
+                        var original = model.CulturasRealizadas
+                            .FirstOrDefault(c => c.NomeCultura.Trim().ToUpper() == salva.Cultura.Trim().ToUpper());
+                        if (original != null)
+                        {
+                            original.AreaPlantada = salva.AreaPlantada;
+                            original.AreaColhida = salva.AreaColhida;
+                            original.ProducaoSacas = salva.Produtividade * salva.AreaColhida;
+                            original.PrecoMedioVenda = salva.PrecoMedio;
+                            original.CustoTotal = salva.CustoProducaoHa * salva.AreaPlantada;
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                ViewBag.ErroBanco = "Não foi possível carregar as simulações.";
+            }
+
+            // PREÇO MÉDIO REALIZADO — Σ valor final do contrato ÷ Σ sacas por cultura.
+            // Vence a simulação salva: entra depois do bloco das simulações.
+            if (!string.IsNullOrEmpty(connString))
+            {
+                try
+                {
+                    var precos = await PrecoMedioService.ObterPorCulturaAsync(connString, safra);
+
+                    foreach (var cultura in model.CulturasRealizadas)
+                    {
+                        var p = precos.FirstOrDefault(x =>
+                            x.Safra == cultura.Safra?.Trim().ToUpper() &&
+                            x.Cultura == cultura.NomeCultura?.Trim().ToUpper());
+
+                        if (p != null)
+                            cultura.PrecoMedioVenda = p.PrecoMedio;
+                    }
+                }
+                catch (Exception)
+                {
+                    // sem preço, a tela segue com o que veio das simulações
+                }
+            }
+
+            if (!incluirBraquiaria)
+            {
+                model.CulturasRealizadas = model.CulturasRealizadas
+                    .Where(c => !EhBraquiaria(c.NomeCultura)).ToList();
+            }
+
+            return View(model);
+        }
+
+        /// <summary>
+        /// Braquiária é PASTAGEM, não lavoura: entra na área plantada do ERP mas não tem
+        /// colheita de grão, e deixá-la no quadro derruba a produtividade média de tudo. Fica
+        /// fora por padrão, com um checkbox para reexibir.
+        ///
+        /// O casamento é por nome normalizado e aceita as duas grafias porque elas variam entre
+        /// bases — 'BRAQUI' e 'BRACHI'.
+        /// </summary>
+        private static bool EhBraquiaria(string nomeCultura)
+        {
+            if (string.IsNullOrEmpty(nomeCultura)) return false;
+            var n = nomeCultura.ToUpperInvariant()
+                .Replace("Á", "A").Replace("Â", "A").Replace("À", "A")
+                .Replace("Í", "I").Replace("Ã", "A");
+            return n.Contains("BRAQUI") || n.Contains("BRACHI");
         }
     }
 }

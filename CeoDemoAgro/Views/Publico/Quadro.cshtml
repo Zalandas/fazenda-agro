@@ -1,0 +1,459 @@
+﻿@model CeoManager.Models.QuadroSafraViewModel
+@{
+    Layout = "_LayoutPublico";
+    ViewBag.Titulo = "Quadro de Safras";
+    ViewBag.AbaAtiva = "quadro";
+}
+
+<div class="d-flex justify-content-between align-items-center gap-2 mb-3 flex-wrap">
+    <div>
+        <div style="font-size:.7rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--green-700)">Relatório</div>
+        <h1 class="mb-0" style="font-size:1.4rem;font-weight:800;color:var(--ink)">Quadro de Safras — @(Model.SafraSelecionada)</h1>
+    </div>
+</div>
+
+@if (ViewBag.ErroBanco != null)
+{
+    <div class="nota-agro is-perigo mb-3">
+        <div class="nota-agro-titulo"><i class="fa-solid fa-triangle-exclamation me-2"></i> Falha de conexão</div>
+        <div class="nota-agro-corpo">@ViewBag.ErroBanco</div>
+    </div>
+}
+
+<!-- Filtro -->
+<div class="card-agro filtros-agro mb-3">
+    <div class="card-body">
+        <form method="get" action="/p/quadro/@ViewBag.Token">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-3">
+                    <label class="form-label fw-bold mb-1" style="color:var(--ink)">
+                        <i class="fa-solid fa-calendar-days me-1" style="color:var(--green-600)"></i> Safra:
+                    </label>
+                    <select name="safra" class="form-select form-select-sm fw-bold shadow-none" onchange="this.form.submit()">
+                        @foreach (var s in Model.SafrasDisponiveis)
+                        {
+                            <option value="@s" selected="@(s == Model.SafraSelecionada)">@s</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-12 col-md-4">
+                    <label class="form-label fw-bold mb-1" style="color:var(--ink)">
+                        <i class="fa-solid fa-seedling me-1" style="color:var(--green-600)"></i> Pastagem:
+                    </label>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="chkBraquiaria" name="incluirBraquiaria" value="true"
+                               @(ViewBag.IncluirBraquiaria == true ? "checked" : "")
+                               onchange="this.form.submit()">
+                        <label class="form-check-label fw-semibold" for="chkBraquiaria" style="color:var(--ink-2)">
+                            Incluir Braquiária
+                        </label>
+                    </div>
+                </div>
+
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Gráficos -->
+<div class="row mt-2">
+    <div class="col-lg-6 mb-4">
+        <div class="card-agro h-100 m-0" style="display: flex; flex-direction: column;">
+            <div class="card-header py-2">
+                <h3 class="card-title fs-6 m-0 fw-bold" style="color:var(--ink)"><i class="fa-solid fa-money-bill-trend-up me-2" style="color:var(--green-600)"></i> Financeiro (R$)</h3>
+            </div>
+            <div class="card-body p-2" style="position: relative; flex: 1 1 auto; min-height: 280px;">
+                <canvas id="graficoFinanceiro"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 mb-4">
+        <div class="card-agro h-100 m-0" style="display: flex; flex-direction: column;">
+            <div class="card-header py-2">
+                <h3 class="card-title fs-6 m-0 fw-bold" style="color:var(--ink)"><i class="fa-solid fa-map me-2" style="color:var(--blue)"></i> Área Plantada (HA)</h3>
+            </div>
+            <div class="card-body p-2" style="position: relative; flex: 1 1 auto; min-height: 280px;">
+                <canvas id="graficoArea"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 mb-4">
+        <div class="card-agro h-100 m-0" style="display: flex; flex-direction: column;">
+            <div class="card-header py-2">
+                <h3 class="card-title fs-6 m-0 fw-bold" style="color:var(--ink)"><i class="fa-solid fa-percent me-2" style="color:var(--green-600)"></i> Margem Operacional</h3>
+            </div>
+            <div class="card-body p-2" style="position: relative; flex: 1 1 auto; min-height: 280px;">
+                <canvas id="graficoMargem"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cartões Realizado/Projetado -->
+<div class="row row-metrics align-items-stretch mb-4">
+    <div class="col-lg col-md-4 mb-3 mb-lg-0">
+        <div class="kpi kpi-1 h-100">
+            <div class="w-100">
+                <h4 style="font-size:1.5rem;">@Model.AreaTotalRealizada.ToString("N1") <span>HA</span></h4>
+                <p class="mb-1">Área Plantada · Realizado</p>
+                <h4 style="font-size:1.5rem;" id="cardProjArea">0,00</h4>
+                <p>Área Plantada · Projetado</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg col-md-4 mb-3 mb-lg-0">
+        <div class="kpi kpi-2 h-100">
+            <div class="w-100">
+                <h4 style="font-size:1.5rem;">@Model.ReceitaBrutaRealizada.ToString("N0") <span>R$</span></h4>
+                <p class="mb-1">Receita Bruta · Realizado</p>
+                <h4 style="font-size:1.5rem;" id="cardProjRB">0</h4>
+                <p>Receita Bruta · Projetado</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg col-md-4 mb-3 mb-lg-0">
+        <div class="kpi kpi-3 h-100">
+            <div class="w-100">
+                <h4 style="font-size:1.5rem;">@Model.CustoTotalRealizado.ToString("N0") <span>R$</span></h4>
+                <p class="mb-1">Custo Total · Realizado</p>
+                <h4 style="font-size:1.5rem;" id="cardProjCusto">0</h4>
+                <p>Custo Total · Projetado</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg col-md-6 mb-3 mb-lg-0">
+        <div class="kpi kpi-4 h-100">
+            <div class="w-100">
+                <h4 style="font-size:1.5rem;">@Model.ReceitaLiquidaRealizada.ToString("N0") <span>R$</span></h4>
+                <p class="mb-1">Receita Líquida · Realizado</p>
+                <h4 style="font-size:1.5rem;" id="cardProjRL">0</h4>
+                <p>Receita Líquida · Projetado</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg col-md-6">
+        <div class="kpi kpi-5 h-100">
+            <div class="w-100">
+                <h4 style="font-size:1.5rem;">@((Model.MargemOperacionalRealizada * 100).ToString("N1"))<span>%</span></h4>
+                <p class="mb-1">Margem Oper. · Realizado</p>
+                <h4 style="font-size:1.5rem;" id="cardProjMargem">0,00%</h4>
+                <p>Margem Oper. · Projetado</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Projetado | Realizado | Desvio (só leitura) -->
+<div class="row">
+    <div class="col-lg-5 border-end border-2 border-info pe-3">
+        <div class="d-flex align-items-center mb-3" style="height:40px">
+            <h4 class="text-info fw-bold m-0"><i class="fa-solid fa-pen-to-square me-2"></i> PROJETADO</h4>
+        </div>
+        <div id="containerProjetado"></div>
+    </div>
+
+    <div class="col-lg-5 border-end border-2 border-success px-3">
+        <div class="d-flex align-items-center mb-3" style="height:40px">
+            <h4 class="text-success fw-bold m-0"><i class="fa-solid fa-check-double me-2"></i> REALIZADO</h4>
+        </div>
+
+        @if (!Model.CulturasRealizadas.Any())
+        {
+            <div class="nota-agro is-info">
+                <div class="nota-agro-titulo"><i class="fa-solid fa-circle-info me-2"></i> Sem dados</div>
+                <div class="nota-agro-corpo">Nenhum dado consolidado para a safra selecionada.</div>
+            </div>
+        }
+
+        @foreach (var cultura in Model.CulturasRealizadas)
+        {
+            <div class="card-agro card-cultura">
+                <div class="card-header px-3 py-2 d-flex align-items-center" style="height:42px">
+                    <h6 class="m-0 fw-bold" style="color:var(--ink)">@cultura.NomeCultura</h6>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm table-striped m-0 tabela-espelho" style="font-size:.85rem">
+                        <colgroup><col style="width:60%"><col style="width:40%"></colgroup>
+                        <tbody>
+                            <tr><td class="text-muted">ÁREA PLANTADA (HA)</td><td class="text-end fw-bold" style="color:var(--ink)">@cultura.AreaPlantada.ToString("N2")</td></tr>
+                            <tr><td class="text-muted">ÁREA COLHIDA (HA)</td><td class="text-end fw-bold" style="color:var(--ink)">@cultura.AreaColhida.ToString("N2")</td></tr>
+                            <tr><td class="text-muted">PRODUTIVIDADE (SC/HA)</td><td class="text-end fw-bold" style="color:var(--ink)">@cultura.Produtividade.ToString("N2")</td></tr>
+                            <tr class="table-light"><td class="fw-bold" style="color:var(--ink)">TOTAL DE PRODUÇÃO (SC)</td><td class="text-end fw-bold text-primary fs-6">@cultura.ProducaoSacas.ToString("N2")</td></tr>
+                            <tr><td class="text-muted">PREÇO MÉDIO (R$/SC)</td><td class="text-end fw-bold" style="color:var(--ink)">@cultura.PrecoMedioVenda.ToString("C2")</td></tr>
+                            <tr><td class="text-muted">CUSTO DE PRODUÇÃO (R$/HA)</td><td class="text-end fw-bold" style="color:var(--ink)">@cultura.CustoProducaoHa.ToString("C2")</td></tr>
+                            <tr class="table-light"><td class="fw-bold" style="color:var(--ink)">RECEITA BRUTA (R$)</td><td class="text-end text-success fw-bold">@cultura.ReceitaBruta.ToString("C2")</td></tr>
+                            <tr><td class="fw-bold text-danger">CUSTO TOTAL (R$)</td><td class="text-end fw-bold text-danger">@cultura.CustoTotal.ToString("C2")</td></tr>
+                            <tr><td class="fw-bold text-success">RECEITA LÍQUIDA (R$)</td><td class="text-end fw-bold @(cultura.ReceitaLiquida < 0 ? "text-danger" : "text-success") fs-6">@cultura.ReceitaLiquida.ToString("C2")</td></tr>
+                            <tr><td class="fw-bold text-primary">MARGEM OPERACIONAL %</td><td class="text-end fw-bold @(cultura.MargemOperacional < 0 ? "text-danger" : "text-primary")">@((cultura.MargemOperacional * 100).ToString("N2"))%</td></tr>
+                            <tr><td class="fw-bold text-warning">MARGEM LUCRATIVIDADE %</td><td class="text-end fw-bold @(cultura.MargemLucratividade < 0 ? "text-danger" : "text-warning")">@((cultura.MargemLucratividade * 100).ToString("N2"))%</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="col-lg-2 ps-3">
+        <div class="d-flex align-items-center justify-content-center mb-3" style="height:40px">
+            <h4 class="fw-bold m-0" style="color:var(--ink)"><i class="fa-solid fa-scale-balanced me-2 text-secondary"></i> Desvio</h4>
+        </div>
+        <div id="containerDiferenca"></div>
+    </div>
+</div>
+
+<style>
+    .bi-agro .tabela-espelho {
+        table-layout: fixed;
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        .bi-agro .tabela-espelho td {
+            height: 44px !important;
+            vertical-align: middle;
+            padding: 4px 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+    .bi-agro .card-cultura {
+        border: 1px solid var(--linha, #d9e5dd);
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(11, 61, 44, 0.06);
+        margin-bottom: 1.25rem;
+        overflow: hidden;
+    }
+
+        .bi-agro .card-cultura .card-header {
+            border-top: 3px solid var(--green-600);
+            background: var(--surface-alt, #f6f9f7);
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+        }
+</style>
+
+@section Scripts {
+    <script>
+        Chart.defaults.color = '#6b7f72';
+        Chart.defaults.borderColor = '#e6ede8';
+        Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+
+        function barraGradiente(context) {
+            var chart = context.chart, area = chart.chartArea;
+            if (!area) { return '#146c43'; }
+            var g = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+            g.addColorStop(0, '#4cc088'); g.addColorStop(1, '#146c43');
+            return g;
+        }
+        function barraGradienteAzul(context) {
+            var chart = context.chart, area = chart.chartArea;
+            if (!area) { return '#1e4a7b'; }
+            var g = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+            g.addColorStop(0, '#3d6ea5'); g.addColorStop(1, '#1e4a7b');
+            return g;
+        }
+
+        const dadosRealizado = @Html.Raw(Json.Serialize(Model.CulturasRealizadas));
+        const simulacoesProjetado = @Html.Raw(Json.Serialize(Model.SimulacoesSalvas));
+
+        const totalRealizadoRB = @Model.ReceitaBrutaRealizada.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        const totalRealizadoCusto = @Model.CustoTotalRealizado.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        const totalRealizadoRL = @Model.ReceitaLiquidaRealizada.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        const totalRealizadoArea = @Model.AreaTotalRealizada.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        const totalRealizadoMargem = @((Model.MargemOperacionalRealizada * 100).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
+
+        const formatterBRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+        const formatterNum = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        let chartFinanceiro = null, chartArea = null, chartMargem = null;
+
+        function num(v) { return typeof v === 'number' ? v : (parseFloat(v) || 0); }
+
+        function renderizar() {
+            const cProj = document.getElementById('containerProjetado');
+            const cDif = document.getElementById('containerDiferenca');
+            cProj.innerHTML = '';
+            cDif.innerHTML = '';
+
+            let totalProjArea = 0, totalProjRB = 0, totalProjCusto = 0;
+
+            dadosRealizado.forEach((real, index) => {
+                // Projetado da mesma cultura (se houver simulação salva)
+                const proj = simulacoesProjetado.find(s =>
+                    s.cultura.trim().toUpperCase() === real.nomeCultura.trim().toUpperCase());
+
+                const ap = proj ? num(proj.areaPlantada) : 0;
+                const ac = proj ? num(proj.areaColhida) : 0;
+                const prod = proj ? num(proj.produtividade) : 0;
+                const preco = proj ? num(proj.precoMedio) : 0;
+                const custoHa = proj ? num(proj.custoProducaoHa) : 0;
+
+                const totSc = prod * ac;
+                const rb = preco * totSc;
+                const custoTot = custoHa * ap;
+                const rl = rb - custoTot;
+                const margemOp = custoTot > 0 ? (rl / custoTot) * 100 : 0;
+                const margemLuc = rb > 0 ? (rl / rb) * 100 : 0;
+
+                // Realizado (do banco)
+                const rAp = num(real.areaPlantada);
+                const rAc = num(real.areaColhida);
+                const rProd = num(real.produtividade);
+                const rTotSc = num(real.producaoSacas);
+                const rPreco = num(real.precoMedioVenda);
+                const rCustoHa = num(real.custoProducaoHa);
+                const rRB = num(real.receitaBruta);
+                const rCustoTot = num(real.custoTotal);
+                const rRL = num(real.receitaLiquida);
+                const rMargemOp = num(real.margemOperacional) * 100;
+                const rMargemLuc = num(real.margemLucratividade) * 100;
+
+                totalProjArea += ap; totalProjRB += rb; totalProjCusto += custoTot;
+
+                // Card Projetado (texto)
+                cProj.insertAdjacentHTML('beforeend', `
+                    <div class="card-agro card-cultura">
+                        <div class="card-header px-3 py-2 d-flex align-items-center" style="height:42px">
+                            <h6 class="m-0 fw-bold" style="color:var(--ink)">${real.nomeCultura}</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm table-striped m-0 tabela-espelho" style="font-size:.85rem">
+                                <colgroup><col style="width:60%"><col style="width:40%"></colgroup>
+                                <tbody>
+                                    <tr><td class="text-muted">ÁREA PLANTADA (HA)</td><td class="text-end fw-bold" style="color:var(--ink)">${formatterNum.format(ap)}</td></tr>
+                                    <tr><td class="text-muted">ÁREA COLHIDA (HA)</td><td class="text-end fw-bold" style="color:var(--ink)">${formatterNum.format(ac)}</td></tr>
+                                    <tr><td class="text-muted">PRODUTIVIDADE (SC/HA)</td><td class="text-end fw-bold" style="color:var(--ink)">${formatterNum.format(prod)}</td></tr>
+                                    <tr class="table-light"><td class="fw-bold" style="color:var(--ink)">TOTAL DE PRODUÇÃO (SC)</td><td class="text-end fw-bold text-primary fs-6">${formatterNum.format(totSc)}</td></tr>
+                                    <tr><td class="text-muted">PREÇO MÉDIO (R$/SC)</td><td class="text-end fw-bold" style="color:var(--ink)">${formatterBRL.format(preco)}</td></tr>
+                                    <tr><td class="text-muted">CUSTO DE PRODUÇÃO (R$/HA)</td><td class="text-end fw-bold" style="color:var(--ink)">${formatterBRL.format(custoHa)}</td></tr>
+                                    <tr class="table-light"><td class="fw-bold" style="color:var(--ink)">RECEITA BRUTA (R$)</td><td class="text-end fw-bold text-success">${formatterBRL.format(rb)}</td></tr>
+                                    <tr><td class="fw-bold text-danger">CUSTO TOTAL (R$)</td><td class="text-end fw-bold text-danger">${formatterBRL.format(custoTot)}</td></tr>
+                                    <tr><td class="fw-bold text-success">RECEITA LÍQUIDA (R$)</td><td class="text-end fw-bold ${rl < 0 ? 'text-danger' : 'text-success'} fs-6">${formatterBRL.format(rl)}</td></tr>
+                                    <tr><td class="fw-bold text-primary">MARGEM OPERACIONAL %</td><td class="text-end fw-bold ${margemOp < 0 ? 'text-danger' : 'text-primary'}">${formatterNum.format(margemOp)}%</td></tr>
+                                    <tr><td class="fw-bold text-warning">MARGEM LUCRATIVIDADE %</td><td class="text-end fw-bold ${margemLuc < 0 ? 'text-danger' : 'text-warning'}">${formatterNum.format(margemLuc)}%</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `);
+
+                // Card Desvio (Realizado − Projetado)
+                cDif.insertAdjacentHTML('beforeend', `
+                    <div class="card-agro card-cultura" style="background:transparent;box-shadow:none;border-color:transparent">
+                        <div class="card-header border-bottom py-2 d-flex justify-content-center align-items-center" style="height:42px;background:transparent">
+                            <h6 class="m-0 fw-bold text-muted" style="font-size:.75rem">DESVIO</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm table-striped m-0 tabela-espelho text-center" style="font-size:.85rem">
+                                <tbody>
+                                    <tr><td class="fw-bold">${dif(rAp - ap, 'NUM')}</td></tr>
+                                    <tr><td class="fw-bold">${dif(rAc - ac, 'NUM')}</td></tr>
+                                    <tr><td class="fw-bold">${dif(rProd - prod, 'NUM')}</td></tr>
+                                    <tr class="table-light"><td class="fw-bold fs-6">${dif(rTotSc - totSc, 'NUM')}</td></tr>
+                                    <tr><td class="fw-bold">${dif(rPreco - preco, 'BRL')}</td></tr>
+                                    <tr><td class="fw-bold">${dif(rCustoHa - custoHa, 'BRL', true)}</td></tr>
+                                    <tr class="table-light"><td class="fw-bold">${dif(rRB - rb, 'BRL')}</td></tr>
+                                    <tr><td class="fw-bold">${dif(rCustoTot - custoTot, 'BRL', true)}</td></tr>
+                                    <tr><td class="fw-bold fs-6">${dif(rRL - rl, 'BRL')}</td></tr>
+                                    <tr><td class="fw-bold">${dif(rMargemOp - margemOp, 'PCT')}</td></tr>
+                                    <tr><td class="fw-bold">${dif(rMargemLuc - margemLuc, 'PCT')}</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `);
+            });
+
+            // Cards de topo — Projetado
+            const totalProjRL = totalProjRB - totalProjCusto;
+            const totalProjMargem = totalProjCusto > 0 ? (totalProjRL / totalProjCusto) * 100 : 0;
+            document.getElementById('cardProjArea').innerText = formatterNum.format(totalProjArea);
+            document.getElementById('cardProjRB').innerText = totalProjRB.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+            document.getElementById('cardProjCusto').innerText = totalProjCusto.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+            document.getElementById('cardProjRL').innerText = totalProjRL.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+            document.getElementById('cardProjMargem').innerText = formatterNum.format(totalProjMargem) + '%';
+
+            desenharGraficos(totalProjRB, totalProjCusto, totalProjRL, totalProjArea, totalProjMargem);
+        }
+
+        function dif(valor, tipo, isCusto = false) {
+            let txt = '';
+            if (tipo === 'BRL') txt = formatterBRL.format(valor);
+            else if (tipo === 'PCT') txt = formatterNum.format(valor) + '%';
+            else txt = formatterNum.format(valor);
+            if (valor > 0) txt = '+' + txt;
+
+            let cor = 'var(--muted)';
+            if (valor > 0) cor = isCusto ? 'var(--danger)' : 'var(--green-700)';
+            else if (valor < 0) cor = isCusto ? 'var(--green-700)' : 'var(--danger)';
+
+            return `<span style="color:${cor}">${txt}</span>`;
+        }
+
+        function desenharGraficos(projRB, projCusto, projRL, projArea, projMargem) {
+            if (chartFinanceiro) chartFinanceiro.destroy();
+            if (chartArea) chartArea.destroy();
+            if (chartMargem) chartMargem.destroy();
+
+            const base = {
+                type: 'bar',
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: { x: { grid: { display: false } }, y: { grid: { color: 'rgba(11,61,44,0.06)' } } }
+                }
+            };
+
+            chartFinanceiro = new Chart(document.getElementById('graficoFinanceiro').getContext('2d'), {
+                ...base,
+                data: {
+                    labels: ['Rec. Bruta', 'Custo Total', 'Rec. Líquida'],
+                    datasets: [
+                        { label: 'Projetado', data: [projRB, projCusto, projRL], backgroundColor: barraGradienteAzul, borderRadius: 7, borderSkipped: false },
+                        { label: 'Realizado', data: [totalRealizadoRB, totalRealizadoCusto, totalRealizadoRL], backgroundColor: barraGradiente, borderRadius: 7, borderSkipped: false }
+                    ]
+                },
+                options: {
+                    ...base.options,
+                    plugins: { ...base.options.plugins, tooltip: { backgroundColor: '#0b3d2c', padding: 12, cornerRadius: 10, callbacks: { label: c => c.dataset.label + ': ' + formatterBRL.format(c.raw) } } },
+                    scales: { ...base.options.scales, y: { ...base.options.scales.y, ticks: { callback: v => v >= 1000000 ? 'R$ ' + (v/1000000).toFixed(1) + 'M' : 'R$ ' + v } } }
+                }
+            });
+
+            chartArea = new Chart(document.getElementById('graficoArea').getContext('2d'), {
+                ...base,
+                data: {
+                    labels: ['Hectares'],
+                    datasets: [
+                        { label: 'Proj', data: [projArea], backgroundColor: barraGradienteAzul, borderRadius: 7, borderSkipped: false, barPercentage: 0.6 },
+                        { label: 'Real', data: [totalRealizadoArea], backgroundColor: barraGradiente, borderRadius: 7, borderSkipped: false, barPercentage: 0.6 }
+                    ]
+                },
+                options: {
+                    ...base.options,
+                    plugins: { ...base.options.plugins, tooltip: { backgroundColor: '#0b3d2c', padding: 12, cornerRadius: 10, callbacks: { label: c => c.dataset.label + ': ' + formatterNum.format(c.raw) + ' HA' } } }
+                }
+            });
+
+            chartMargem = new Chart(document.getElementById('graficoMargem').getContext('2d'), {
+                ...base,
+                data: {
+                    labels: ['% Margem'],
+                    datasets: [
+                        { label: 'Proj', data: [projMargem], backgroundColor: barraGradienteAzul, borderRadius: 7, borderSkipped: false, barPercentage: 0.6 },
+                        { label: 'Real', data: [totalRealizadoMargem], backgroundColor: barraGradiente, borderRadius: 7, borderSkipped: false, barPercentage: 0.6 }
+                    ]
+                },
+                options: {
+                    ...base.options,
+                    plugins: { ...base.options.plugins, tooltip: { backgroundColor: '#0b3d2c', padding: 12, cornerRadius: 10, callbacks: { label: c => c.dataset.label + ': ' + formatterNum.format(c.raw) + '%' } } },
+                    scales: { ...base.options.scales, y: { ...base.options.scales.y, ticks: { callback: v => v + '%' } } }
+                }
+            });
+        }
+
+        renderizar();
+    </script>
+}

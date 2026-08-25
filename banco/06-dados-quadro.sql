@@ -1,0 +1,190 @@
+-- =====================================================================
+--  QUADRO DE SAFRAS — custo, faturamento e a simulação projetada.
+--
+--  Tudo fictício. O que esta carga acrescenta é a metade FINANCEIRA da
+--  safra: quanto custou produzir e por quanto o grão foi vendido. Com
+--  isso o quadro fecha margem por cultura.
+--
+--  Como nos outros arquivos, os números foram escolhidos para que uma
+--  regra quebrada mude o resultado de forma visível. A tabela do fim
+--  diz o que esperar e o que cada desvio denuncia.
+-- =====================================================================
+
+SET NAMES utf8mb4;
+
+-- ---------------------------------------------------------------------
+--  BRAQUIÁRIA — o motivo do checkbox
+--
+--  É PASTAGEM, não lavoura: ocupa área, consome custo e não produz saca
+--  nenhuma. Deixá-la no quadro derruba a produtividade média e a margem
+--  de tudo, então ela fica fora por padrão.
+--
+--  Sem uma linha destas o checkbox "Incluir Braquiária" seria um
+--  controle que não faz nada — pior que não existir.
+-- ---------------------------------------------------------------------
+INSERT INTO produto (codProduto, nomeProduto) VALUES
+  (30, 'BRAQUIARIA');
+
+INSERT INTO talhao (codTalhao, nomeTalhao, areaTalhao, codUnidPessoaFaz) VALUES
+  (4, 'T-04 Pasto', 50.0000, 1);
+
+-- Sem cultivar e com fechaColheita = 0: não há colheita de grão, então a
+-- área COLHIDA dela é zero e a plantada não.
+INSERT INTO configsafra
+  (codSafra, codUnidPessoaFaz, codTalhao, codProdutoCultura, codProdutoCultivar, codCiclo, areaPrevistaConfigSafra, fechaColheitaConfigSafra)
+VALUES
+  (1, 1, 4, 30, NULL, 1, 50.0000, 0);
+
+-- ---------------------------------------------------------------------
+--  CUSTO DE PRODUÇÃO — aplicações por talhão, somadas por (safra, cultura)
+-- ---------------------------------------------------------------------
+INSERT INTO aplictalhao (codAplicTalhao, codSafra, codProdutoCultura) VALUES
+  (1, 1, 10),   -- soja
+  (2, 1, 11),   -- milho
+  (3, 1, 30);   -- braquiária
+
+INSERT INTO itensaplictalhao (codItAplicTalhao, codAplicTalhao, valorItAplicTalhao) VALUES
+  -- SOJA: 990.000,00 em 330 ha = 3.000,00/ha
+  (1, 1, 420000.00),
+  (2, 1, 350000.00),
+  (3, 1, 220000.00),
+  -- MILHO: 250.000,00 em 100 ha = 2.500,00/ha
+  (4, 2, 150000.00),
+  (5, 2, 100000.00),
+  -- BRAQUIÁRIA: 60.000,00 em 50 ha = 1.200,00/ha, e nenhuma receita
+  (6, 3,  60000.00);
+
+-- ---------------------------------------------------------------------
+--  FATURAMENTO — de onde sai o PREÇO MÉDIO realizado
+--
+--  A conta tem DOIS termos que não podem se sobrepor:
+--    (1) as NOTAS já emitidas contra o contrato, exceto adiantamento;
+--    (2) o SALDO do contrato ainda NÃO faturado.
+--
+--  O que torna isso difícil é que o ERP **não abate o saldo ao faturar**:
+--  a parcela paga continua com o saldo cheio. Sem descontar o que já
+--  virou documento, o contrato conta duas vezes.
+-- ---------------------------------------------------------------------
+INSERT INTO tipooperacao (codTipoOper, nomeTipoOper) VALUES
+  (1, 'VENDA DE PRODUCAO'),
+  (2, 'DEVOLUCAO DE VENDA DE PRODUCAO');
+
+INSERT INTO documento (codDoc, valorDoc, codTipoOper, historicoDoc) VALUES
+  -- CT-001: faturou 3.000 das 5.000 sc
+  (1, 360000.00, 1, 'Faturamento parcial do contrato'),
+  -- CT-002: faturou as 2.940 sc entregues (2.940 x 126,00)
+  (2, 370440.00, 1, 'Faturamento da entrega'),
+  -- CT-002: ADIANTAMENTO. Fica FORA do termo (1) — é o mesmo dinheiro que a
+  -- nota quita por encontro de contas, e contá-lo dobraria o contrato.
+  (3, 100000.00, 1, 'ADIANTAMENTO sobre contrato de venda'),
+  -- CT-004: venda e a DEVOLUÇÃO dela, que entra com sinal invertido
+  (4, 246000.00, 1, 'Faturamento do contrato'),
+  (5,  24600.00, 2, 'Devolucao parcial da venda'),
+  -- CT-003: contrato em dólar, faturado por inteiro
+  (6, 288000.00, 1, 'Faturamento do contrato'),
+  -- CT-005: faturou 500 das 1.000 sc
+  (7,  27000.00, 1, 'Faturamento parcial do contrato');
+
+-- A ponte nota <-> contrato. O adiantamento entra por codParcelaCAdt, os
+-- demais por codParcelaC — a consulta aceita as duas.
+INSERT INTO parceladocumento
+  (codParcela, codDocumento, codParcelaC, codParcelaCAdt, valorPrincParcela)
+VALUES
+  (1, 1, 2,    NULL, 360000.00),
+  (2, 2, 3,    NULL, 370440.00),
+  (3, 3, NULL, 3,    100000.00),   -- adiantamento
+  (4, 4, 6,    NULL, 246000.00),
+  (5, 5, 6,    NULL,  24600.00),   -- devolução
+  (6, 6, 4,    NULL, 288000.00),
+  (7, 7, 7,    NULL,  27000.00);
+
+-- Acréscimo e desconto do faturamento vêm da BAIXA, não da nota — a nota
+-- guarda o valor de face. Só o CT-001 tem, para o efeito ficar isolado.
+INSERT INTO baixa (codBaixa, canceladaBaixa) VALUES
+  (1, 0),
+  (2, 1);   -- CANCELADA: os itens dela não podem entrar
+
+INSERT INTO itensbaixa
+  (codItBaixa, codBaixa, codParcelaDocumento, acrescimoPrincItBaixa, descontoPrincItBaixa, retencao)
+VALUES
+  (1, 1, 1, 12000.00,  6000.00, 0),   -- CT-001: +12.000 -6.000 = +6.000
+  (2, 1, 1,     0.00,     0.00, 1),   -- RETENÇÃO: fica fora
+  (3, 2, 1, 99000.00,     0.00, 0);   -- de baixa CANCELADA: fica fora
+
+-- A cotação do dólar. A linha do ano 3905 é o retrato de um defeito real da
+-- base de origem: pegar "a mais recente" sem teto de data traz ela, com valor
+-- 1,00, e a conversão do saldo em dólar vira o valor nominal.
+INSERT INTO cotacaomoeda (codCotacao, codMoeda, dataCotMoeda, valor) VALUES
+  (1, 2, '2025-06-30', 5.000000),
+  (2, 2, '2025-01-15', 4.800000),
+  (3, 2, '3905-01-01', 1.000000);   -- LIXO: a consulta a barra com <= CURDATE()
+
+-- ---------------------------------------------------------------------
+--  A SIMULAÇÃO PROJETADA — o outro lado da comparação
+--
+--  `cliente` precisa casar com Demo:NomeCliente do appsettings: a consulta
+--  filtra por LIKE '%cliente%'.
+-- ---------------------------------------------------------------------
+INSERT INTO simulacao_projetado
+  (id, cliente, safra, cultura, areaPlantada, areaColhida, produtividade, precoMedio, custoProducaoHa)
+VALUES
+  (1, 'Fazenda Crissiumal', '2024/2025', 'SOJA',  330.0000, 330.0000,  58.0000, 115.0000, 2900.0000),
+  (2, 'Fazenda Crissiumal', '2024/2025', 'MILHO', 100.0000, 100.0000, 105.0000,  68.0000, 2400.0000);
+
+-- simulacao_realizado fica VAZIA de propósito.
+--
+-- Uma linha ali SOBRESCREVE área, produção, preço e custo que vieram do ERP —
+-- é o recurso para o cliente que não tem banco de origem. Preenchê-la aqui
+-- faria a tela mostrar números que não saem do dado que o demo carrega, e a
+-- conferência à mão perderia o sentido. A tabela existe para o código ser
+-- cópia literal; ela responder vazio é o caso normal de quem TEM ERP.
+
+-- =====================================================================
+--  RESULTADO ESPERADO — safra 2024/2025
+--
+--  PREÇO MÉDIO REALIZADO
+--    SOJA    R$ 1.197.840,00 ÷ 10.000 sc  =  119,784 R$/sc
+--            (CT-001 606.000 + CT-002 370.440 + CT-004 221.400)
+--    MILHO   R$   354.000,00 ÷  5.000 sc  =   70,80  R$/sc
+--            (CT-003 300.000 + CT-005 54.000)
+--
+--  QUADRO (sem braquiária, que é o padrão)
+--                     SOJA            MILHO
+--    Área plantada    330,00 ha       100,00 ha
+--    Área colhida     330,00 ha       100,00 ha
+--    Produção         20.250 sc       11.000 sc
+--    Produtividade     61,36 sc/ha    110,00 sc/ha
+--    Preço médio      119,784         70,80
+--    Custo/ha          3.000,00        2.500,00
+--    Receita bruta  2.425.626,00     778.800,00
+--    Custo total      990.000,00     250.000,00
+--    Receita líquida 1.435.626,00    528.800,00
+--
+--    TOTAIS   430 ha · bruta 3.204.426,00 · custo 1.240.000,00
+--             líquida 1.964.426,00 · margem operacional 158,42%
+--
+--  COM braquiária, os totais viram 480 ha · custo 1.300.000,00 ·
+--  líquida 1.904.426,00 · margem 146,49%. A receita não muda: é
+--  exatamente por isso que ela fica fora.
+--
+--  ---------------------------------------------------------------------
+--  O QUE CADA NÚMERO DENUNCIA SE VIER DIFERENTE
+--
+--  SOJA a 179,78 R$/sc     → o saldo do contrato não foi abatido pelo que
+--                            já virou nota. O CT-001 contou 966.000 em vez
+--                            de 606.000: o mesmo grão duas vezes.
+--  SOJA a 129,784          → o ADIANTAMENTO do CT-002 entrou no termo (1).
+--  SOJA a 120,540          → o adiantamento não foi subtraído no termo (2),
+--                            deixando 7.560 de resíduo fantasma.
+--  SOJA a 122,244          → a devolução do CT-004 entrou somando em vez de
+--                            subtrair (+24.600 no lugar de -24.600).
+--  SOJA a 119,184          → a baixa CANCELADA ou a linha de RETENÇÃO
+--                            entraram nos acréscimos.
+--  MILHO a 68,40 R$/sc     → a cotação do ano 3905 foi usada: o saldo em
+--                            dólar do CT-003 converteu a 1,00.
+--  Produtividade da soja
+--    em 61,36 mas a área
+--    colhida menor que 330 → a regra da faixa de cultivar mudou.
+--  Braquiária aparecendo
+--    sem marcar o checkbox → o filtro caiu; a margem cai 12 pontos.
+-- =====================================================================

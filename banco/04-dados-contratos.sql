@@ -89,14 +89,21 @@ INSERT INTO fixacoescontrato (codFixacao, codContrato, quantidade, valor) VALUES
 
 -- DATA_PGTO é a MENOR parcela, não a primeira cadastrada: os contratos 1 e 3
 -- têm duas, fora de ordem no INSERT de propósito.
-INSERT INTO parcelacontrato (codParcela, codContrato, vencimentoParcela) VALUES
-  (1, 1, '2025-04-10'),
-  (2, 1, '2025-03-10'),
-  (3, 2, '2025-05-15'),
-  (4, 3, '2025-08-10'),
-  (5, 3, '2025-07-10'),
-  (6, 4, '2025-06-20'),
-  (7, 5, '2025-09-05');
+--
+-- `saldoAltParcela` só é lido pelo QUADRO DE SAFRAS, no preço médio, e mora aqui
+-- porque é dado do contrato. A soma dos saldos de um contrato é o valor dele
+-- INTEIRO, faturado ou não — o ERP não abate ao emitir a nota. Quem desconta o
+-- que já virou documento é a consulta; ver o 06-dados-quadro.sql.
+INSERT INTO parcelacontrato
+  (codParcela, codContrato, vencimentoParcela, saldoAltParcela, codMoedaAltParcela)
+VALUES
+  (1, 1, '2025-04-10', 240000.00, NULL),
+  (2, 1, '2025-03-10', 360000.00, NULL),   -- esta é a que a nota D1 fatura
+  (3, 2, '2025-05-15', 378000.00, NULL),
+  (4, 3, '2025-08-10',  60000.00, 2),      -- em DÓLAR: converte pela cotação
+  (5, 3, '2025-07-10',      0.00, 2),      -- saldo zero: a consulta a ignora
+  (6, 4, '2025-06-20', 246000.00, NULL),
+  (7, 5, '2025-09-05',  54000.00, NULL);
 
 -- ---------------------------------------------------------------------
 --  AS ENTREGAS
