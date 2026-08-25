@@ -1,0 +1,279 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewBag.Titulo — Agro BI</title>
+    @* O sistema real serve aqui um manifesto PWA por token (/p/manifest/{token}),
+       que torna o portal instalável no celular do cliente. Esta demonstração não
+       tem esse endpoint, e um <link rel="manifest"> apontando para o vazio daria
+       404 em toda visita. *@
+    <meta name="theme-color" content="#146c43" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    @* Mesma versão do _Layout interno: na 6.0.0 faltam ícones usados nos KPIs
+       (fa-sack-dollar, fa-money-bill-trend-up, fa-wheat-awn...) e eles saíam em branco. *@
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="~/css/site.css" />
+    <style>
+        body {
+            background-color: #f4f6f9;
+            margin: 0;
+        }
+
+        .layout-publico {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar-publica {
+            width: 260px;
+            flex: none;
+            background: linear-gradient(270deg, #2a8a5e 0%, #146c43 42%, #0b3d2c 100%);
+            font-family: 'Sora', system-ui, sans-serif;
+            display: flex;
+            flex-direction: column;
+            transition: margin-left .25s ease;
+        }
+
+        /* Coluna à direita da sidebar: cabeçalho fixo no topo + conteúdo rolável */
+        .area-conteudo {
+            flex: 1 1 auto;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .conteudo-publico {
+            flex: 1 1 auto;
+            min-width: 0;
+            padding: 1.5rem;
+        }
+
+        /* Cabeçalho — mesmo papel da navbar da tela interna: guarda o botão de
+           recolher, que precisa continuar visível com a sidebar fechada. */
+        .topo-publico {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            padding: .5rem 1rem;
+            background: #fff;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .btn-toggle-publico {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 10px;
+            background: transparent;
+            color: var(--ink);
+            font-size: 1.15rem;
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+        }
+
+            .btn-toggle-publico:hover {
+                background: var(--green-100);
+                color: var(--green-700);
+            }
+
+        .topo-publico .topo-titulo {
+            font-family: 'Sora', system-ui, sans-serif;
+            font-weight: 700;
+            color: var(--ink);
+            letter-spacing: .02em;
+        }
+
+        /* Desktop: sidebar recolhida desliza para fora */
+        .layout-publico.sidebar-recolhida .sidebar-publica {
+            margin-left: -260px;
+        }
+
+        /* Marca / logo — retângulo branco sangrando de ponta a ponta da sidebar */
+        .sidebar-publica .marca {
+            padding: 0;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+            background: #ffffff;
+            position: relative;
+            overflow: hidden;
+        }
+
+            /* A faixa branca sangra de ponta a ponta e a arte fica centralizada.
+               O respiro vem do padding, e não de margem embutida na imagem: a
+               marca aqui é um SVG sem borda branca, ao contrário do PNG do
+               sistema real, que trazia a sua própria. */
+            .sidebar-publica .marca {
+                padding: 14px 16px;
+            }
+
+            .sidebar-publica .marca img {
+                display: block;
+                width: 100%;
+                height: auto;
+                max-height: none;
+                margin: 0 auto;
+                border-radius: 0;
+            }
+
+        .sidebar-publica .cliente-nome {
+            color: rgba(255,255,255,.75);
+            font-size: 1.05rem;
+            font-weight: 600;
+            text-align: center;
+            padding: 10px 12px 4px;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+
+        .sidebar-publica .nav-pub {
+            list-style: none;
+            padding: 12px 10px;
+            margin: 0;
+        }
+
+            .sidebar-publica .nav-pub a {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: .7rem 1rem;
+                margin: 2px 0;
+                border-radius: 10px;
+                color: rgba(255,255,255,.85);
+                text-decoration: none;
+                font-weight: 600;
+                font-size: 1.05rem;
+            }
+
+                .sidebar-publica .nav-pub a i {
+                    color: #6ee7b7;
+                    width: 20px;
+                    text-align: center;
+                }
+
+                .sidebar-publica .nav-pub a:hover {
+                    background: rgba(255,255,255,.08);
+                    color: #fff;
+                }
+
+                .sidebar-publica .nav-pub a.active {
+                    background: rgba(76,192,136,.18);
+                    color: #fff;
+                    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+                }
+
+        /* Mobile: sidebar sobreposta, começa escondida */
+        @@media (max-width: 768px) {
+            .sidebar-publica {
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                z-index: 1040;
+                transform: translateX(-100%);
+                transition: transform .25s ease;
+                margin-left: 0; /* anula o recolhimento do desktop */
+            }
+
+            .layout-publico.sidebar-aberta .sidebar-publica {
+                transform: translateX(0);
+            }
+
+            .conteudo-publico {
+                padding: 1rem .75rem;
+            }
+        }
+
+        @@media print {
+            .topo-publico {
+                display: none;
+            }
+        }
+    </style>
+    @RenderSection("Head", required: false)
+</head>
+<body>
+    @{
+        var token = ViewBag.Token as string;
+        var ativa = ViewBag.AbaAtiva as string;
+    }
+    <div class="layout-publico">
+
+        <aside class="sidebar-publica">
+            <div class="marca">
+                <img src="~/images/marca.svg" alt="Agro BI — demonstração" />
+            </div>
+            @if (ViewBag.NomeCliente != null)
+            {
+                <div class="cliente-nome">@ViewBag.NomeCliente</div>
+            }
+            @* O portal do sistema real tem quatro telas. Esta demonstração traz UMA, e o menu
+               mostra só ela: item que leva a 404 não é promessa do que vem, é defeito à vista.
+               As outras entram aqui quando existirem. *@
+            <ul class="nav-pub">
+                <li><a class="active" href="/p/producao/@token"><i class="fa-solid fa-chart-column"></i> Produção</a></li>
+            </ul>
+
+            @* --- menu original, para quando as outras telas vierem ---
+            @if (false)
+            {
+                <ul class="nav-pub">
+                    <li><a class="@(ativa == "producao" ? "active" : "")" href="/p/producao/@token"><i class="fa-solid fa-chart-column"></i> Produção</a></li>
+                    <li><a class="@(ativa == "contratos" ? "active" : "")" href="/p/contratos/@token"><i class="fa-solid fa-file-signature"></i> Contratos</a></li>
+                    <li><a class="@(ativa == "insumos" ? "active" : "")" href="/p/insumos/@token"><i class="fa-solid fa-flask"></i> Insumos</a></li>
+                    <li><a class="@(ativa == "quadro" ? "active" : "")" href="/p/quadro/@token"><i class="fa-solid fa-table-list"></i> Quadro de Safras</a></li>
+                </ul>
+            }
+            --- fim do menu original *@
+        </aside>
+
+        <div class="area-conteudo">
+            <header class="topo-publico d-print-none">
+                <button type="button" class="btn-toggle-publico" onclick="toggleSidebar()"
+                        aria-label="Recolher menu" title="Recolher menu">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <span class="topo-titulo">@ViewBag.Titulo</span>
+            </header>
+
+            <main class="conteudo-publico">
+                <div class="bi-agro">
+                    @RenderBody()
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Chave própria: o estado do menu do portal não se mistura com o da tela interna.
+        const CHAVE_MENU_PUBLICO = 'menu_publico_recolhido';
+
+        function toggleSidebar() {
+            var layout = document.querySelector('.layout-publico');
+
+            // No mobile a sidebar é sobreposta: abre e fecha, sem estado persistido.
+            if (window.matchMedia('(max-width: 768px)').matches) {
+                layout.classList.toggle('sidebar-aberta');
+                return;
+            }
+
+            var recolhida = layout.classList.toggle('sidebar-recolhida');
+            localStorage.setItem(CHAVE_MENU_PUBLICO, recolhida ? '1' : '0');
+        }
+
+        if (localStorage.getItem(CHAVE_MENU_PUBLICO) === '1') {
+            document.querySelector('.layout-publico').classList.add('sidebar-recolhida');
+        }
+
+        // PWA: só registra em contexto seguro (HTTPS/localhost); em HTTP falharia no console.
+        if ('serviceWorker' in navigator && window.isSecureContext) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/sw-portal.js', { scope: '/p/' })
+                    .catch(function (err) { console.log('SW portal falhou:', err); });
+            });
+        }
+    </script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

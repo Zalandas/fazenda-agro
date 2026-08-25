@@ -1,0 +1,13 @@
+# Build
+bin/
+obj/
+*.user
+
+# Configuração local — o appsettings.json DESTE projeto vai versionado de
+# propósito: as credenciais dele são "demo/demo" contra um banco fictício,
+# e sem ele quem clona não sabe como o token resolve.
+appsettings.Development.json
+appsettings.Production.json
+
+# Volume do MySQL, se alguém rodar o compose sem volume nomeado
+dados/

@@ -1,0 +1,1606 @@
+/* ==========================================================================
+   CEO MANAGER � Folha de estilo �nica
+   --------------------------------------------------------------------------
+   Estrutura:
+     0. Base do template ASP.NET (html, foco, body, rodap� fixo)
+     1. Tokens (:root) � cores, raio, sombra; dispon�veis para todo o app
+     2. Sidebar "Verde Agro" (chrome do layout, fora de .bi-agro)
+     3. Componentes avulsos (a confirmar uso)
+     4. Design System "Verde Agro" (.bi-agro) � conte�do das views
+
+   Carregar UMA vez no <head> do _Layout.cshtml, DEPOIS do CSS do
+   Bootstrap/AdminLTE. As views convertidas s� envolvem o conte�do em
+   <div class="bi-agro">. As fontes Sora/Inter v�m por <link> no <head>.
+   ========================================================================== */
+
+
+/* 0. BASE DO TEMPLATE ======================================================
+   Herdado do template padr�o do ASP.NET Core. Mantido.                     */
+html {
+    font-size: 14px;
+    position: relative;
+    min-height: 100%;
+}
+
+@media (min-width: 768px) {
+    html {
+        font-size: 16px;
+    }
+}
+
+/* Anel de foco padr�o do template (azul). Pode ser trocado por verde no
+   futuro para ficar coerente com a marca � ver nota no chat. */
+.btn:focus,
+.btn:active:focus,
+.btn-link.nav-link:focus,
+.form-control:focus,
+.form-check-input:focus {
+    box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+body {
+    background-color: #f0f2f5;
+    margin-bottom: 60px; /* espa�o para o rodap� fixo */
+}
+
+
+/* 1. TOKENS ================================================================
+   Em :root para que a sidebar, a navbar e as views possam referenciar as
+   mesmas cores. Vari�veis n�o pintam nada sozinhas � n�o afetam telas ainda
+   n�o convertidas.                                                          */
+:root {
+    --green-900: #0b3d2c;
+    --green-700: #146c43;
+    --green-600: #1a8552;
+    --green-500: #27a366;
+    --green-400: #4cc088;
+    --green-100: #dff3e7;
+    --green-200: #cfe8da; /* borda de superf�cie verde-100 (bot�o de a��o "ver") */
+    --ink: #0e2318;
+    --ink-2: #41564a;
+    --muted: #6b7f72;
+    --line: #e6ede8;
+    --blue: #1e4a7b; /* acento secund�rio (m�dulo BPO, �cone de �rea) */
+    --blue-100: #e4edf7; /* fundo suave do acento azul */
+    --blue-200: #cddef0; /* borda do acento azul */
+    --danger: #d64550; /* bot�o Sair / estados de erro */
+    --danger-100: #fbe9ea; /* fundo suave de perigo (card-perigo, nota de perigo) */
+    --danger-200: #f0d4d6; /* borda de perigo */
+    --warn: #b0770f; /* aten��o / �mbar � margens, saldos pendentes */
+    --warn-100: #fbf1df; /* fundo suave de aten��o */
+    --warn-200: #f0e1c2; /* borda de aten��o */
+    --surface-alt: #f4f7fa; /* superf�cie neutra p/ blocos agrupadores dentro de formul�rio */
+
+    --radius: 20px;
+    --shadow: 0 10px 30px rgba(11,61,44,.07), 0 2px 6px rgba(11,61,44,.05);
+}
+
+
+/* 2. SIDEBAR "VERDE AGRO" ==================================================
+   Chrome do layout AdminLTE (fica FORA de .bi-agro). Consolidado a partir do
+   <style> que estava inline no _Layout.cshtml � pode remover aquele bloco.  */
+.app-sidebar {
+    background: linear-gradient(270deg, #2a8a5e 0%, #146c43 42%, #0b3d2c 100%) !important;
+    font-family: 'Sora', system-ui, sans-serif;
+    /* Coluna flex: ver a explicação em .sidebar-wrapper logo abaixo. */
+    display: flex;
+    flex-direction: column;
+}
+
+    /* ---------- Altura do menu (corte da sidebar em tela baixa) ----------
+       O AdminLTE calcula .sidebar-wrapper como height: calc(100vh - 3.5rem),
+       partindo da faixa de marca com a altura FIXA que ele próprio define. A
+       nossa marca é bem maior (min-height 110px + 50px de padding) e teve o
+       height trocado por auto — então o contêiner do menu ficava ~54px mais
+       alto que a tela. Ele até rolava, mas transbordava pela borda inferior, e
+       o último item do menu ficava inalcançável em monitor baixo.
+
+       A correção não subtrai um número novo: subtrair de novo erraria assim que
+       a marca mudasse de tamanho. A sidebar vira coluna flex, a marca ocupa o
+       que precisa e o menu fica com o que sobrar, qualquer que seja.
+
+       min-height: 0 é obrigatório e não é detalhe: sem ele um filho flex se
+       recusa a encolher abaixo do próprio conteúdo, e aí o overflow-y nunca
+       chega a rolar — o menu voltaria a vazar para fora da tela. */
+    .app-sidebar .sidebar-brand,
+    .app-sidebar .brand-link {
+        flex: 0 0 auto;
+    }
+
+    .app-sidebar .sidebar-wrapper {
+        flex: 1 1 auto;
+        height: auto;
+        min-height: 0;
+        /* A barra de rolagem padrão some no verde escuro; sem enxergá-la, a
+           impressão é de menu cortado e não de menu rolável. */
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,.35) transparent;
+    }
+
+        .app-sidebar .sidebar-wrapper::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .app-sidebar .sidebar-wrapper::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,.28);
+            border-radius: 8px;
+        }
+
+            .app-sidebar .sidebar-wrapper::-webkit-scrollbar-thumb:hover {
+                background: rgba(255,255,255,.45);
+            }
+
+/* Tela baixa: a marca cede espaço em vez de empurrar o menu para fora.
+   O seletor leva "aside" na frente de propósito — o _Layout ainda tem um
+   <style> duplicando .app-sidebar .brand-link, e ele vem DEPOIS do site.css
+   no <head>. Sem o peso extra do elemento, a regra abaixo perderia o empate. */
+@media (max-height: 800px) {
+    aside.app-sidebar .brand-link {
+        padding-top: 14px;
+        padding-bottom: 10px;
+        min-height: 0;
+    }
+
+        aside.app-sidebar .brand-link img {
+            max-height: 48px;
+        }
+}
+
+    /* ---------- Marca / topo ---------- */
+    .app-sidebar .brand-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        /* 16px, e não os 28/22 que estiveram escritos aqui: o <style> do _Layout
+           declarava "padding: 16px" e, por vir depois no <head>, o shorthand anulava
+           estes longhands. Ou seja, 16px é o que a tela sempre mostrou. Ao remover
+           aquele bloco, o valor real veio para cá — restaurar 28/22 deixaria a marca
+           ~18px mais alta e agravaria o corte do menu em monitor baixo. */
+        padding: 16px;
+        border-bottom: 1px solid rgba(255,255,255,.08);
+        background: transparent;
+        min-height: 110px;
+        overflow: visible;
+    }
+
+        .app-sidebar .brand-link img {
+            max-height: 72px;
+            width: auto;
+            border-radius: 10px;
+        }
+
+    .app-sidebar .brand-logo {
+        width: 44px;
+        height: 44px;
+        flex: none;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #4cc088, #0b3d2c);
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 1.1rem;
+        box-shadow: 0 10px 30px rgba(11,61,44,.25);
+    }
+
+    .app-sidebar .brand-text {
+        font-family: 'Sora', sans-serif;
+        font-weight: 800;
+        font-size: 1.15rem;
+        letter-spacing: -.01em;
+        color: #ffffff !important;
+    }
+
+    /* Faixa da marca: retangulo branco sangrando de ponta a ponta da sidebar,
+       do topo ate a linha que separa do menu. O logo tem fundo branco proprio
+       (nao transparente), por isso a faixa e branca e nao o gradiente. */
+    .app-sidebar .sidebar-brand {
+        background: #ffffff !important;
+        border-bottom: 1px solid rgba(255,255,255,.08);
+        padding: 0;
+        margin: 0;
+        display: block;
+        width: 100%;
+        /* O AdminLTE fixa height:3.5rem + overflow:hidden aqui; sem o auto
+           a faixa corta o logo em 56px. */
+        height: auto;
+        overflow: hidden;
+    }
+
+        /* A faixa branca sangra de ponta a ponta, mas a arte fica em ~52% da
+           largura, centralizada (o PNG ja traz margem branca propria, que aqui
+           vira o respiro da faixa). */
+        .app-sidebar .sidebar-brand img {
+            display: block;
+            width: 52%;
+            height: auto;
+            max-height: none;
+            margin: 0 auto;
+            border-radius: 0;
+        }
+
+        /* Sidebar recolhida (4.6rem): a arte ocupa quase toda a faixa estreita */
+        .sidebar-mini.sidebar-collapse .app-sidebar .sidebar-brand img {
+            width: 86%;
+        }
+
+    /* R�tulo "MENU" Não alterar aqui (ver _Layout.cshtml)*/
+    .app-sidebar .menu-label {
+        font-size: .68rem;
+        font-weight: 700;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,.4);
+        /* 10px no topo, não 4px: era o valor do <style> do _Layout, que vencia este
+           por vir depois. Preservado ao consolidar, para o espaçamento entre grupos
+           do menu continuar o que sempre foi. */
+        padding: 10px 16px 8px;
+    }
+
+    /* ---------- Itens do menu ---------- */
+    .app-sidebar .nav-sidebar .nav-item {
+        margin: 2px 10px;
+    }
+
+    .app-sidebar .nav-link > i,
+    .app-sidebar .nav-link .nav-icon {
+        color: #6ee7b7 !important;
+        font-size: 1rem;
+        margin-right: 12px;
+        width: 20px;
+        text-align: center;
+    }
+
+    .app-sidebar .nav-link:hover {
+        color: #ffffff;
+        background: rgba(255,255,255,.08);
+    }
+
+    .app-sidebar .nav-link .right,
+    .app-sidebar .nav-link .fa-angle-right {
+        color: rgba(255,255,255,.5) !important;
+        margin-right: 0;
+        width: auto;
+    }
+
+    .app-sidebar .nav-link.active {
+        color: #ffffff;
+        font-weight: 700;
+        background: rgba(76,192,136,.18);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+    }
+
+        .app-sidebar .nav-link.active .nav-icon {
+            color: #6ee7b7;
+        }
+
+    /* 1º nível de submenu (Cadastros, Fluxo de Caixa sob BPO) */
+    .app-sidebar .nav-treeview .nav-link {
+        padding-left: 3rem !important;
+    }
+
+        .app-sidebar .nav-treeview .nav-link p {
+            font-size: .95rem;
+        }
+
+    .app-sidebar .nav-treeview .nav-icon {
+        font-size: .85rem;
+    }
+
+    /* 2º nível (Empresas, Categorias sob Cadastros) — recuo maior */
+    .app-sidebar .nav-treeview .nav-treeview > .nav-item > .nav-link {
+        padding-left: 4.5rem !important;
+    }
+
+    /* Seta dos itens com submenu */
+    .app-sidebar .nav-link .nav-arrow {
+        color: rgba(255,255,255,.5);
+    }
+
+
+/* 3. COMPONENTES AVULSOS ===================================================
+   Fora do design system Verde Agro. Preservado por precau��o � se n�o estiver
+   em uso em nenhuma tela, pode ser removido.                                */
+.card-glass-light {
+    background: rgba(255,255,255,.7) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255,255,255,.9) !important;
+    box-shadow: 0 8px 32px 0 rgba(0,0,0,.05) !important;
+}
+
+
+/* ==========================================================================
+   4. DESIGN SYSTEM "VERDE AGRO" (.bi-agro)
+   --------------------------------------------------------------------------
+   Componentes de conte�do das views. Escopados em .bi-agro para n�o
+   reestilizar telas AdminLTE ainda n�o migradas.
+   ========================================================================== */
+
+/* Base tipogr�fica */
+.bi-agro {
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--ink);
+}
+
+    .bi-agro h1,
+    .bi-agro h2,
+    .bi-agro h3,
+    .bi-agro h4,
+    .bi-agro .font-display {
+        font-family: 'Sora', sans-serif;
+        letter-spacing: -.02em;
+    }
+
+
+    /* Bot�es */
+    .bi-agro .btn-agro {
+        background: var(--green-700);
+        border: 1px solid var(--green-700);
+        color: #fff;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: .8rem;
+        padding: .5rem 1.1rem;
+    }
+
+        .bi-agro .btn-agro:hover {
+            background: var(--green-900);
+            border-color: var(--green-900);
+            color: #fff;
+        }
+
+    .bi-agro .btn-agro-outline {
+        background: #fff;
+        border: 1px solid var(--green-600);
+        color: var(--green-700);
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: .8rem;
+        padding: .5rem 1.1rem;
+    }
+
+        .bi-agro .btn-agro-outline:hover {
+            background: var(--green-700);
+            color: #fff;
+        }
+
+
+    /* Cart�o base */
+    .bi-agro .card-agro {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+    }
+
+        /* Mesma armadilha do .card-header/.card-footer: o padding do .card-body sai de
+           var(--bs-card-spacer-x), declarada no seletor .card — que estes cartoes nao tem.
+           Sem a variavel a declaracao e descartada e o corpo fica com padding ZERO, colando
+           o conteudo na borda. As views que precisam de outro valor ja usam p-0 / px-4 / p-2,
+           e utilitario do Bootstrap e !important, entao continuam mandando. */
+        .bi-agro .card-agro .card-body {
+            padding: 1rem;
+        }
+
+        .bi-agro .card-agro .card-header {
+            background: #f2f7f4;
+            border-bottom: 1px solid var(--line);
+            border-radius: var(--radius) var(--radius) 0 0;
+            /* O padding do .card-header/.card-footer do Bootstrap sai de
+               var(--bs-card-cap-padding-x), e essa variavel e declarada na classe .card — que
+               os nossos cartoes NAO tem, por serem .card-agro. Sem a variavel a declaracao
+               inteira e descartada e o padding cai para ZERO: o titulo e o rodape ficavam
+               colados na borda, um passo a esquerda das celulas da tabela (que usam ps-3).
+               1rem para casar com ps-3/pe-3. */
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+
+    /* Barra de filtros
+   Aplicar como: <div class="card-agro filtros-agro"> e N�O usar py-2 no
+   card-body (o padding abaixo d� o respiro que limpa o raio de 20px). */
+    .bi-agro .filtros-agro > .card-body {
+        padding: 1rem 1.25rem 1.1rem;
+    }
+
+    .bi-agro .filtros-agro .form-label {
+        margin-bottom: .4rem;
+        font-size: .82rem;
+    }
+
+    .bi-agro .filtros-agro .form-select {
+        border-color: var(--line);
+        border-radius: 12px;
+        color: var(--ink);
+    }
+
+        .bi-agro .filtros-agro .form-select:focus {
+            border-color: var(--green-600);
+            box-shadow: 0 0 0 .2rem rgba(20,108,67,.12);
+        }
+
+
+    /* KPIs � fundo verde esmaecido (esquerda -> direita) + acento no topo */
+    .bi-agro .kpi {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid #ecf4ee;
+        border-radius: var(--radius);
+        background: linear-gradient(90deg, #eaf5ee 0%, #f4faf6 45%, #ffffff 100%);
+        box-shadow: var(--shadow);
+        padding: 1.25rem 1.4rem;
+    }
+
+        .bi-agro .kpi::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+        }
+
+        .bi-agro .kpi.kpi-1::before {
+            background: linear-gradient(90deg, var(--green-900), var(--ink-2));
+        }
+
+        .bi-agro .kpi.kpi-2::before {
+            background: linear-gradient(90deg, var(--green-600), var(--green-400));
+        }
+
+        .bi-agro .kpi.kpi-3::before {
+            background: linear-gradient(90deg, var(--green-500), var(--green-400));
+        }
+
+        .bi-agro .kpi h4 {
+            font-family: 'Sora', sans-serif;
+            font-weight: 800;
+            font-size: 1.9rem;
+            color: var(--ink);
+            font-variant-numeric: tabular-nums;
+            margin: 0;
+        }
+
+            .bi-agro .kpi h4 span {
+                font-size: .85rem;
+                font-weight: 600;
+                color: var(--muted);
+            }
+
+        .bi-agro .kpi p {
+            color: var(--muted) !important;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            font-size: .72rem !important;
+            margin: .25rem 0 0;
+        }
+
+        .bi-agro .kpi .kpi-ic {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: var(--green-100);
+            color: var(--green-700);
+            display: grid;
+            place-items: center;
+            font-size: 1rem;
+        }
+
+
+    /* Barra de progresso em célula (ex.: Produtividade / Espelho de Talhões) */
+    .bi-agro .barra-prod {
+        height: 6px;
+        border-radius: 999px;
+        background: #dfe7e2; /* trilho / valor zero */
+        overflow: hidden;
+        margin-top: 5px;
+    }
+
+        .bi-agro .barra-prod > span {
+            display: block;
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(270deg, #4cc088, #146c43); /* direita → esquerda */
+        }
+
+    /* Tabelas */
+
+    .bi-agro .table-agro {
+        font-size: .85rem;
+        margin: 0;
+    }
+
+        /*.bi-agro .table-agro thead th {
+            background: #f2f7f4;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            font-size: .68rem;
+            font-weight: 700;
+            border-bottom: 1px solid var(--line);
+        }*/
+
+    /* Cabe�alho fixo s� nas tabelas com rolagem interna (BIs) */
+    .bi-agro .table-responsive .table-agro thead th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+        .bi-agro .table-agro tbody td {
+            border-bottom: 1px solid #eef3ef;
+            vertical-align: middle;
+        }
+
+    .bi-agro .talhao-badge {
+        display: inline-block;
+        padding: .15rem .65rem;
+        border-radius: 999px;
+        background: var(--green-100);
+        color: var(--green-700);
+        font-weight: 700;
+        font-size: .72rem;
+    }
+
+    .bi-agro .prod-cell {
+        font-weight: 700;
+        color: var(--green-700);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .bi-agro .sc-cell {
+        font-weight: 700;
+        color: var(--ink);
+    }
+
+    /* Badge de status (reutiliz�vel em tabelas financeiras) */
+    .bi-agro .status-agro {
+        display: inline-block;
+        padding: .2rem .7rem;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: .7rem;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+
+        .bi-agro .status-agro.is-ok {
+            background: var(--green-700);
+            color: #fff;
+        }
+
+        .bi-agro .status-agro.is-pendente {
+            background: var(--green-100);
+            color: var(--green-700);
+        }
+
+        /* Atraso e encerrado: a carteira de locacao tem tres estados, e os dois verdes
+           existentes so distinguem dois. Vermelho para o que pede cobranca, neutro para
+           o contrato que ja acabou e nao pede nada. */
+        .bi-agro .status-agro.is-atraso {
+            background: var(--danger-100);
+            color: var(--danger);
+            border: 1px solid var(--danger-200);
+        }
+
+        .bi-agro .status-agro.is-encerrado {
+            background: #f2f5f3;
+            color: var(--muted);
+            border: 1px solid var(--line);
+        }
+
+    /* Faixa de acento do 4� cart�o de KPI */
+    .bi-agro .kpi.kpi-4::before {
+        background: linear-gradient(90deg, var(--green-700), var(--green-500));
+    }
+
+    .bi-agro .kpi.kpi-5::before {
+        background: linear-gradient(90deg, var(--warn), #d9a13a);
+    }
+
+    /* Cabe�alho fixo ao rolar � vale para TODAS as tabelas .table-agro */
+    .bi-agro .table-agro thead th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    /* Tabela piv� / matriz (custos por talh�o � categoria, e afins) */
+    .bi-agro .table-agro.table-pivot th,
+    .bi-agro .table-agro.table-pivot td {
+        vertical-align: middle;
+        font-size: .85rem;
+    }
+
+    .bi-agro .table-agro .row-metric-header {
+        width: 140px;
+        font-weight: 600;
+        color: var(--ink-2);
+        background: #f6f9f7;
+    }
+
+    .bi-agro .table-agro .pivot-group > td {
+        background: #eef5f0;
+        color: var(--ink);
+        font-weight: 700;
+    }
+
+    .bi-agro .table-agro tfoot td {
+        background: #f2f7f4;
+        color: var(--ink);
+    }
+
+
+.bi-agro .text-primary {
+    color: var(--green-700) !important;
+}
+
+.bi-agro .text-success {
+    color: var(--green-700) !important;
+}
+
+.bi-agro .text-info {
+    color: var(--blue) !important;
+}
+
+.bi-agro .text-danger {
+    color: var(--danger) !important;
+}
+
+.bi-agro .text-warning {
+    color: var(--warn) !important;
+}
+
+.bi-agro .text-secondary {
+    color: var(--muted) !important;
+}
+
+.bi-agro .text-muted {
+    color: var(--muted) !important;
+}
+
+.bi-agro .border-info {
+    border-color: var(--blue) !important;
+}
+
+.bi-agro .border-success {
+    border-color: var(--green-700) !important;
+}
+
+.bi-agro .border-primary {
+    border-color: var(--green-700) !important;
+}
+
+.bi-agro .border-danger {
+    border-color: var(--danger) !important;
+}
+
+.bi-agro .border-warning {
+    border-color: var(--warn) !important;
+}
+
+.bi-agro .table-light > td,
+.bi-agro .table-light > th {
+    background: #f2f7f4 !important;
+    color: var(--ink) !important;
+}
+
+/* Alertas do Bootstrap (TempData de sucesso/erro) repintados na paleta.
+   Ficam como .alert de prop�sito: o data-bs-dismiss do Bootstrap exige essa classe,
+   ent�o troc�-los por .nota-agro quebraria o bot�o de fechar. */
+.bi-agro .alert {
+    border-radius: 12px;
+}
+
+.bi-agro .alert-success {
+    background: var(--green-100);
+    border-color: var(--green-200);
+    color: var(--green-900);
+}
+
+.bi-agro .alert-warning {
+    background: var(--warn-100);
+    border-color: var(--warn-200);
+    color: var(--warn);
+}
+
+.bi-agro .alert-danger {
+    background: var(--danger-100);
+    border-color: var(--danger-200);
+    color: var(--danger);
+}
+
+.bi-agro .alert-info {
+    background: var(--blue-100);
+    border-color: var(--blue-200);
+    color: var(--blue);
+}
+
+    /* ==========================================================================
+   7. CADASTROS � listas CRUD (busca + bot�es de a��o)
+   ========================================================================== */
+
+    /* Campo de busca das listas */
+    .bi-agro .busca-agro .form-control {
+        border-color: var(--line);
+        border-radius: 12px;
+        color: var(--ink);
+    }
+
+        .bi-agro .busca-agro .form-control:focus {
+            border-color: var(--green-600);
+            box-shadow: 0 0 0 .2rem rgba(20,108,67,.12);
+        }
+
+    /* Bot�es de a��o (editar / excluir) � tom suave, s�lido no hover */
+    .bi-agro .btn-acao {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9px;
+        border: 1px solid transparent;
+        font-size: .85rem;
+        line-height: 1;
+    }
+
+    .bi-agro .btn-acao-editar {
+        background: #fbf1df;
+        color: var(--warn);
+        border-color: #f0e1c2;
+    }
+
+        .bi-agro .btn-acao-editar:hover {
+            background: var(--warn);
+            color: #fff;
+        }
+
+    .bi-agro .btn-acao-excluir {
+        background: #fbe9ea;
+        color: var(--danger);
+        border-color: #f3d2d4;
+    }
+
+        .bi-agro .btn-acao-excluir:hover {
+            background: var(--danger);
+            color: #fff;
+        }
+
+    /* Ver / detalhes � tom verde suave */
+    .bi-agro .btn-acao-ver {
+        background: var(--green-100);
+        color: var(--green-700);
+        border-color: var(--green-200);
+    }
+
+        .bi-agro .btn-acao-ver:hover {
+            background: var(--green-700);
+            color: #fff;
+        }
+
+    /* Vincular / relacionar � acento azul (secund�rio), p/ distinguir de ver/editar */
+    .bi-agro .btn-acao-vincular {
+        background: var(--blue-100);
+        color: var(--blue);
+        border-color: var(--blue-200);
+    }
+
+        .bi-agro .btn-acao-vincular:hover {
+            background: var(--blue);
+            color: #fff;
+        }
+
+    /* ==========================================================================
+   8. FORMUL�RIOS � telas Create / Edit
+   ========================================================================== */
+    .bi-agro .form-control,
+    .bi-agro .form-select {
+        border-radius: 10px;
+        color: var(--ink);
+    }
+
+        .bi-agro .form-control:focus,
+        .bi-agro .form-select:focus {
+            border-color: var(--green-600);
+            box-shadow: 0 0 0 .2rem rgba(20,108,67,.12);
+        }
+
+    .bi-agro .card-agro .card-footer {
+        background: #f2f7f4;
+        border-top: 1px solid var(--line);
+        border-radius: 0 0 var(--radius) var(--radius);
+        /* Ver a nota do .card-header: sem isto o rodape fica colado na borda. */
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    /* Confirma��o de exclus�o (Delete) */
+    .bi-agro .card-agro.card-perigo {
+        border-color: var(--danger-200);
+    }
+
+        .bi-agro .card-agro.card-perigo .card-header {
+            background: var(--danger-100);
+            border-bottom-color: var(--danger-200);
+        }
+
+    /* --------------------------------------------------------------------------
+       Nota / aviso dentro de formul�rio e de confirma��o de exclus�o.
+       Substitui o callout do AdminLTE. Uso:
+         <div class="nota-agro is-info">      � informativa (verde)
+         <div class="nota-agro is-perigo">    � alerta de exclus�o (vermelha)
+           <div class="nota-agro-titulo"><i class="fa-solid fa-circle-info me-1"></i> Nota</div>
+           <div class="nota-agro-corpo">texto</div>
+         </div>
+       -------------------------------------------------------------------------- */
+    .bi-agro .nota-agro {
+        border-radius: 12px;
+        padding: .9rem 1rem;
+        margin-top: 1rem;
+    }
+
+        .bi-agro .nota-agro .nota-agro-titulo {
+            font-weight: 700;
+            margin-bottom: .25rem;
+        }
+
+        .bi-agro .nota-agro .nota-agro-corpo,
+        .bi-agro .nota-agro p {
+            color: var(--ink-2);
+            margin: 0;
+        }
+
+        .bi-agro .nota-agro.is-info {
+            background: var(--green-100);
+            border: 1px solid var(--green-200);
+        }
+
+            .bi-agro .nota-agro.is-info .nota-agro-titulo {
+                color: var(--ink);
+            }
+
+                .bi-agro .nota-agro.is-info .nota-agro-titulo i {
+                    color: var(--green-600);
+                }
+
+        .bi-agro .nota-agro.is-perigo {
+            background: var(--danger-100);
+            border: 1px solid var(--danger-200);
+        }
+
+            .bi-agro .nota-agro.is-perigo .nota-agro-titulo,
+            .bi-agro .nota-agro.is-perigo .nota-agro-titulo i {
+                color: var(--danger);
+            }
+
+    .bi-agro .btn-perigo {
+        background: var(--danger);
+        border: 1px solid var(--danger);
+        color: #fff;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: .8rem;
+        padding: .5rem 1.1rem;
+    }
+
+        .bi-agro .btn-perigo:hover {
+            background: #b8363f;
+            border-color: #b8363f;
+            color: #fff;
+        }
+
+/* ==========================================================================
+   9. FLUXO DE CAIXA / DRE — tabela matricial de 14 colunas (.table-dre)
+   --------------------------------------------------------------------------
+   Tabela densa: 12 meses + total + categorias, com hierarquia de 3 níveis
+   vinda do prefixo numérico da categoria. Não usa .table-agro porque o
+   Bootstrap de tabela atrapalha a densidade e o zebrado por nível — mas
+   segue a mesma paleta Verde Agro.
+
+   Regras de cor que carregam significado e NÃO podem ser suavizadas:
+     - valor negativo sempre em vermelho (--danger);
+     - linhas de nível 1/2, subtotais e resultados sempre em negrito.
+   ========================================================================== */
+.bi-agro .table-dre {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--ink);
+}
+
+    .bi-agro .table-dre th,
+    .bi-agro .table-dre td {
+        border: 1px solid var(--line);
+        padding: 5px 9px;
+        text-align: right;
+    }
+
+    /* Cabeçalho dos meses — mesmo gradiente da sidebar (direita -> esquerda) */
+    .bi-agro .table-dre .cabecalho {
+        background: linear-gradient(270deg, #2a8a5e 0%, var(--green-700) 42%, var(--green-900) 100%);
+        color: #fff;
+        border-color: rgba(255,255,255,.14);
+        font-family: 'Sora', sans-serif;
+        font-size: .8rem;
+        font-weight: 700;
+        letter-spacing: .02em;
+        text-align: center;
+        text-transform: uppercase;
+    }
+
+    /* Nível 1 — grupo raiz do plano de contas */
+    .bi-agro .table-dre .nivel-1 {
+        background: var(--green-100);
+        font-weight: 700;
+        color: var(--ink);
+        cursor: pointer;
+    }
+
+    /* Nível 2 — subgrupo */
+    .bi-agro .table-dre .nivel-2 {
+        background: #eef5f0;
+        font-weight: 700;
+        font-style: italic;
+        color: var(--ink);
+        cursor: pointer;
+    }
+
+    /* Nível 3 — categoria analítica (folha, clicável para drill-down) */
+    .bi-agro .table-dre .nivel-3 {
+        background: #fff;
+        color: var(--ink-2);
+    }
+
+        .bi-agro .table-dre .nivel-3:hover {
+            background: #f7fbf9;
+        }
+
+    /* Subtotais de receita e despesa */
+    .bi-agro .table-dre .linha-subtotal-receita,
+    .bi-agro .table-dre .linha-subtotal-despesa {
+        background: var(--green-200);
+        font-weight: 700;
+        color: var(--ink);
+    }
+
+    /* Resultados e saldo — degradê verde suave, mantendo fundo claro para
+       que o vermelho de valor negativo continue legível. */
+    .bi-agro .table-dre .linha-resultado-verde {
+        background: linear-gradient(270deg, #d6ecdf 0%, var(--green-200) 100%);
+        font-weight: 700;
+        color: var(--ink);
+    }
+
+    /* Respiro entre o saldo e o bloco de resultado/margem. Sem borda lateral para
+       não parecer uma linha de dado vazia. */
+    .bi-agro .table-dre .linha-espacadora td {
+        height: 14px;
+        padding: 0;
+        background: #fff;
+        border-left: 0;
+        border-right: 0;
+    }
+
+    /* Previsão e Saldo Projetado — azul, o mesmo acento que o sistema já usa para
+       "Projetado" no Quadro de Safras. A distinção de cor é o que impede confundir
+       número simulado com número conciliado. */
+    .bi-agro .table-dre .linha-previsao td {
+        background: var(--blue-100);
+        border-color: var(--blue-200);
+        padding: 2px 4px;
+    }
+
+        .bi-agro .table-dre .linha-previsao td:first-child {
+            color: var(--blue);
+            font-weight: 600;
+            padding-left: 8px !important;
+        }
+
+    .bi-agro .table-dre .input-previsao {
+        width: 100%;
+        min-width: 78px;
+        border: 1px solid var(--blue-200);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--blue);
+        font-size: .78rem;
+        font-weight: 600;
+        text-align: right;
+        padding: 3px 6px;
+    }
+
+        .bi-agro .table-dre .input-previsao:focus {
+            outline: 0;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 2px rgba(30, 74, 123, .15);
+        }
+
+        /* Confirmação de gravação: some sozinha, sem ocupar espaço nem exigir clique. */
+        .bi-agro .table-dre .input-previsao.previsao-salva {
+            border-color: var(--green-500);
+            background: var(--green-100);
+        }
+
+        .bi-agro .table-dre .input-previsao.previsao-erro {
+            border-color: var(--danger);
+            background: var(--danger-100);
+        }
+
+    .bi-agro .table-dre .previsao-travada {
+        color: var(--muted);
+        opacity: .5;
+    }
+
+    .bi-agro .table-dre .linha-projetado {
+        background: linear-gradient(270deg, #dbe7f4 0%, var(--blue-200) 100%);
+        font-weight: 700;
+        color: var(--blue);
+    }
+
+        .bi-agro .table-dre .linha-projetado td {
+            border-color: var(--blue-200);
+        }
+
+    .bi-agro .table-dre .linha-margem td {
+        background: var(--blue-100);
+        border-color: var(--blue-200);
+    }
+
+    .bi-agro .table-dre .margem-azul {
+        color: var(--blue);
+        font-weight: 700;
+    }
+
+    /* Semântica de sinal — vermelho de negativo é informação, não decoração */
+    .bi-agro .table-dre .valor-negativo {
+        color: var(--danger);
+    }
+
+    .bi-agro .table-dre .valor-positivo {
+        color: var(--ink);
+    }
+
+    /* Seta de expandir/recolher dos grupos */
+    .bi-agro .table-dre .btn-toggle {
+        display: inline-block;
+        width: 18px;
+        margin-right: 5px;
+        color: var(--green-700);
+        font-style: normal;
+        font-weight: 700;
+        font-size: .7rem;
+        text-align: center;
+        cursor: pointer;
+        user-select: none;
+    }
+
+/* Moldura da tabela: o raio de 20px do card-agro precisa recortar a tabela */
+.bi-agro .quadro-dre {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    background: #fff;
+}
+
+/* Cabeçalho verde dos modais (drill-down e saldo inicial) */
+.bi-agro .modal-header-agro,
+.modal .modal-header-agro {
+    background: linear-gradient(270deg, #2a8a5e 0%, var(--green-700) 42%, var(--green-900) 100%);
+    color: #fff;
+    border-bottom: 0;
+}
+
+    .modal .modal-header-agro .modal-title {
+        font-family: 'Sora', sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+    }
+
+/* Linha de agrupador na árvore de categorias (níveis 1 e 2 do plano de contas),
+   para distinguir do que é subcategoria sincronizada. */
+.bi-agro .linha-agrupador > td {
+    background: #f2f7f4;
+}
+
+/* ==========================================================================
+   10. TABELAS COM TOTAL — regras propositalmente FORA de .bi-agro
+   --------------------------------------------------------------------------
+   Views/Producao/Romaneios.cshtml usa .table-agro e .tabela-total mas ainda
+   NÃO tem o wrapper .bi-agro. Escopar estas duas regras deixaria aquela tela
+   sem cabeçalho e sem linha de total — por isso elas ficam no escopo global.
+   Ao migrar Romaneios.cshtml, mover este bloco para dentro de .bi-agro.
+
+   Referenciavam --brand / --brand-weak, que nunca existiram em :root: as
+   declarações de cor eram inválidas e caíam para transparente/herdado,
+   enquanto o resto do bloco (sticky, caixa alta, padding) seguia valendo.
+   Trocado pelos tokens reais da paleta.
+   ========================================================================== */
+.table-agro tfoot .tabela-total td {
+    background: #f2f7f4;
+    border-top: 2px solid var(--green-700);
+    font-weight: 800;
+    color: var(--ink);
+    padding: 12px 14px;
+}
+
+.table-agro thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f2f7f4;
+    color: var(--green-700);
+    font-weight: 800;
+    font-size: .9rem;
+    letter-spacing: .3px;
+    padding: 12px 14px;
+    border-bottom: 2px solid var(--green-700);
+    text-transform: uppercase;
+}
+
+
+
+
+/* ==========================================================================
+   11. FILTRO DE MÚLTIPLA ESCOLHA
+   --------------------------------------------------------------------------
+   Dropdown do Bootstrap com caixas de marcação dentro, usado no Centro de
+   Custo do Fluxo de Caixa. O <select multiple> nativo obriga a segurar Ctrl,
+   não mostra o que está marcado sem rolar e não cabe na barra de filtros.
+   Exige data-bs-auto-close="outside" no botão, senão marcar fecha a lista.
+   ========================================================================== */
+
+.bi-agro .filtro-multi > .btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    text-align: left;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: .82rem;
+    padding: .375rem .75rem;
+    min-height: 31px;
+}
+
+    .bi-agro .filtro-multi > .btn:hover {
+        border-color: var(--green-600);
+    }
+
+.bi-agro .filtro-multi.show > .btn {
+    border-color: var(--green-600);
+    box-shadow: 0 0 0 .2rem rgba(20,108,67,.12);
+}
+
+.bi-agro .filtro-multi .dropdown-menu {
+    width: 100%;
+    min-width: 240px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: .5rem;
+}
+
+.bi-agro .filtro-multi .filtro-multi-acoes {
+    display: flex;
+    gap: 1rem;
+    padding: .1rem .5rem .5rem;
+    margin-bottom: .35rem;
+    border-bottom: 1px solid var(--line);
+}
+
+    .bi-agro .filtro-multi .filtro-multi-acoes button {
+        background: none;
+        border: 0;
+        padding: 0;
+        font-size: .72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: var(--green-700);
+    }
+
+.bi-agro .filtro-multi .form-check {
+    margin: 0;
+    padding: .3rem .5rem .3rem 2rem;
+    border-radius: 8px;
+}
+
+    .bi-agro .filtro-multi .form-check:hover {
+        background: #f2f7f4;
+    }
+
+.bi-agro .filtro-multi .form-check-label {
+    font-size: .82rem;
+    color: var(--ink);
+    cursor: pointer;
+}
+
+.bi-agro .filtro-multi .form-check-input {
+    cursor: pointer;
+}
+
+    .bi-agro .filtro-multi .form-check-input:checked {
+        background-color: var(--green-700);
+        border-color: var(--green-700);
+    }
+
+/* ==========================================================================
+   12. QUADRO MATRICIAL EM TELA ESTREITA (.table-dre)
+   --------------------------------------------------------------------------
+   14 colunas de dinheiro não cabem num notebook de 1366px sem encolher o
+   número a ponto de atrapalhar a leitura. A saída é rolar na horizontal SEM
+   perder o rótulo da linha: a coluna de categorias fica congelada à esquerda.
+
+   Célula sticky precisa de fundo próprio, senão as outras colunas passam por
+   baixo dela. Onde a linha usa gradiente (270deg = direita -> esquerda), a
+   primeira célula recebe a cor da PONTA ESQUERDA do gradiente, para emendar
+   sem degrau visível.
+   ========================================================================== */
+
+.bi-agro .table-dre th:first-child,
+.bi-agro .table-dre td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: inherit;
+}
+
+.bi-agro .table-dre thead th:first-child {
+    z-index: 3;
+    background: var(--green-900);
+}
+
+.bi-agro .table-dre .linha-resultado-verde td:first-child {
+    background: var(--green-200);
+}
+
+.bi-agro .table-dre .linha-projetado td:first-child {
+    background: var(--blue-200);
+}
+
+.bi-agro .table-dre .nivel-3 td:first-child {
+    background: #fff;
+}
+
+.bi-agro .table-dre .nivel-3:hover td:first-child {
+    background: #f7fbf9;
+}
+
+/* Sombra que avisa que existe conteúdo rolando por baixo da coluna congelada */
+.bi-agro .table-dre tbody td:first-child {
+    box-shadow: 1px 0 0 var(--line);
+}
+
+/* O nome da categoria quebra em duas linhas em vez de ser cortado: assim a
+   coluna cabe em 250px sem esconder texto nem depender de tooltip. */
+.bi-agro .table-dre td:first-child {
+    white-space: normal;
+    line-height: 1.25;
+}
+
+/* Respiro lateral menor devolve ~80px ao longo das 13 colunas de valor */
+.bi-agro .table-dre th,
+.bi-agro .table-dre td {
+    padding: 5px 6px;
+}
+
+/* Abaixo de 1600px o número desce um ponto — 12px em Inter tabular-nums
+   continua confortável e devolve mais ~120px. */
+@media (max-width: 1600px) {
+    .bi-agro .table-dre {
+        font-size: 12px;
+    }
+
+        .bi-agro .table-dre .cabecalho {
+            font-size: .74rem;
+        }
+}
+/* Duas linhas definem o fundo na CÉLULA, não na linha — nelas o `inherit` acima
+   pegaria transparente e as outras colunas passariam por baixo ao rolar. */
+.bi-agro .table-dre .linha-previsao td:first-child {
+    background: var(--blue-100);
+}
+
+.bi-agro .table-dre .linha-espacadora td:first-child {
+    background: #fff;
+    box-shadow: none;
+}
+
+/* --------------------------------------------------------------------------
+   12b. CABEÇALHO DOS MESES FIXO AO ROLAR
+   --------------------------------------------------------------------------
+   O quadro tem ~130 linhas: rolando para conferir, os meses saem da tela e a
+   coluna de valores vira número sem rótulo.
+
+   Para o sticky funcionar, o contêiner precisa ser quem rola. O .table-responsive
+   já é contêiner de rolagem (o overflow-x do Bootstrap torna o overflow-y "auto"),
+   mas sem altura limitada ele nunca rola na vertical — quem rola é a página, e o
+   cabeçalho vai embora junto. Daí a altura máxima: as duas rolagens passam a
+   acontecer aqui dentro, e o mesmo contêiner sustenta o cabeçalho no topo e a
+   coluna de categorias à esquerda.
+   -------------------------------------------------------------------------- */
+.bi-agro .quadro-dre .table-responsive {
+    max-height: calc(100vh - 250px);
+    min-height: 320px;
+    overflow: auto;
+}
+
+.bi-agro .table-dre thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+
+    /* Canto: fixo nos dois eixos, e por isso acima dos outros dois. */
+    .bi-agro .table-dre thead th:first-child {
+        z-index: 4;
+    }
+
+
+/* --------------------------------------------------------------------------
+   12c. FONTE DO CAMPO DE PREVISÃO
+   --------------------------------------------------------------------------
+   <input> não herda fonte do documento: o campo ficava com tamanho próprio,
+   destoando das células ao lado. Na impressão a diferença virava defeito — a
+   tabela cai para 8px e o campo continuava em .78rem (~12,5px), estourando a
+   célula e saindo cortado. Herdar resolve os dois de uma vez.
+   -------------------------------------------------------------------------- */
+.bi-agro .table-dre .input-previsao {
+    font-family: inherit;
+    font-size: inherit;
+}
+
+/* ==========================================================================
+   13. PÁGINA PRINCIPAL — INDICADORES COMPACTOS E ATALHOS
+   --------------------------------------------------------------------------
+   Duas coisas de naturezas diferentes, e a diferença precisa ser visível:
+   o INDICADOR é um número que informa; o ATALHO é um destino, sem número.
+   Se usassem a mesma linguagem, a pessoa procuraria número no atalho e
+   destino no indicador.
+
+   Os indicadores encolheram e subiram para o topo; os atalhos correm
+   horizontalmente logo abaixo, ganhando um ladrilho por vez.
+   ========================================================================== */
+
+/* ---- Indicador compacto ---- */
+.bi-agro .indicador-agro {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    min-width: 230px;
+    padding: .7rem 1.1rem;
+    border-radius: 16px;
+    color: #fff;
+    text-decoration: none;
+    box-shadow: 0 6px 18px rgba(11,61,44,.15);
+    transition: transform .12s ease;
+}
+
+    .bi-agro .indicador-agro:hover {
+        color: #fff;
+        transform: translateY(-2px);
+    }
+
+    .bi-agro .indicador-agro.ind-verde {
+        background: linear-gradient(120deg, var(--green-500), var(--green-700));
+    }
+
+    .bi-agro .indicador-agro.ind-azul {
+        background: linear-gradient(120deg, #2f6bb0, var(--blue));
+    }
+
+.bi-agro .indicador-ic {
+    font-size: 1.15rem;
+    opacity: .55;
+}
+
+.bi-agro .indicador-num {
+    font-family: 'Sora', sans-serif;
+    font-weight: 800;
+    font-size: 1.5rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.bi-agro .indicador-rot {
+    font-size: .76rem;
+    font-weight: 600;
+    opacity: .92;
+    line-height: 1.15;
+}
+
+/* ---- Faixa de atalhos ---- */
+.bi-agro .atalhos-agro {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .7rem;
+}
+
+.bi-agro .atalho-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .45rem;
+    width: 108px;
+    height: 92px;
+    padding: .5rem;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: var(--shadow);
+    color: var(--ink-2);
+    text-decoration: none;
+    text-align: center;
+    transition: transform .12s ease, border-color .12s ease;
+}
+
+    .bi-agro .atalho-tile i {
+        font-size: 1.35rem;
+        color: var(--green-600);
+    }
+
+    .bi-agro .atalho-tile span {
+        font-size: .72rem;
+        font-weight: 600;
+        line-height: 1.15;
+        /* Nome longo quebra em duas linhas e para: sem isto o ladrilho cresce e a
+           faixa perde o alinhamento. */
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .bi-agro .atalho-tile:hover {
+        color: var(--ink);
+        border-color: var(--green-600);
+        transform: translateY(-2px);
+    }
+
+/* O "+" é o mesmo ladrilho, em tom de convite e não de destino */
+.bi-agro .atalho-tile-add {
+    border-style: dashed;
+    background: #f7fbf9;
+    box-shadow: none;
+    cursor: pointer;
+}
+
+/* ---- Estado vazio: convite, e a porta visível do F2 ---- */
+.bi-agro .atalho-vazio {
+    display: flex;
+    align-items: center;
+    gap: .9rem;
+    width: 100%;
+    padding: 1.1rem 1.3rem;
+    border: 1px dashed var(--green-200);
+    border-radius: var(--radius);
+    background: #f7fbf9;
+    color: var(--ink-2);
+    font-size: .88rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+    .bi-agro .atalho-vazio i {
+        font-size: 1.3rem;
+        color: var(--green-600);
+    }
+
+    .bi-agro .atalho-vazio:hover {
+        border-color: var(--green-600);
+    }
+
+/* ---- Opções dentro do modal ---- */
+.bi-agro .atalho-opcao {
+    display: inline-flex;
+    align-items: center;
+    padding: .45rem .8rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--ink-2);
+    cursor: pointer;
+    user-select: none;
+}
+
+    /* Escondido visualmente, mas ainda focavel pelo teclado: display:none tiraria o
+       campo da ordem de tabulacao e a selecao viraria exclusiva de mouse. */
+    .bi-agro .atalho-opcao input {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+        pointer-events: none;
+    }
+
+    .bi-agro .atalho-opcao:focus-within {
+        outline: 2px solid var(--green-600);
+        outline-offset: 2px;
+    }
+
+    .bi-agro .atalho-opcao i {
+        color: var(--green-600);
+    }
+
+    .bi-agro .atalho-opcao:has(input:checked) {
+        background: var(--green-100);
+        border-color: var(--green-600);
+        color: var(--ink);
+    }
+
+    /* Limite atingido: a opção não marcada fica visivelmente fora de alcance, em vez
+       de simplesmente não responder ao clique. */
+    .bi-agro .atalho-opcao.is-bloqueado {
+        opacity: .4;
+        cursor: not-allowed;
+    }
+
+@media print {
+    .bi-agro .atalhos-agro,
+    .bi-agro .atalho-vazio {
+        display: none !important;
+    }
+}
+/* ==========================================================================
+   14. QUADRO RECOLHÍVEL
+   --------------------------------------------------------------------------
+   Cartão cujo cabeçalho é um botão de abrir/fechar. Nasceu no quadro de
+   "Despesas por categoria" de Contas a pagar: é consulta de conferência, não
+   leitura de todo dia, e aberto empurrava a lista de títulos para fora da
+   primeira tela.
+
+   O mecanismo é o collapse do Bootstrap, que o layout já carrega. O que o CSS
+   faz aqui é só devolver ao botão a aparência do cabeçalho — o .btn-link do
+   Bootstrap chega azul e sublinhado — e girar a seta.
+   ========================================================================== */
+
+.bi-agro .card-agro .card-header .btn-link {
+    color: inherit;
+    text-decoration: none;
+    font: inherit;
+    box-shadow: none;
+}
+
+    .bi-agro .card-agro .card-header .btn-link:hover,
+    .bi-agro .card-agro .card-header .btn-link:focus {
+        color: inherit;
+        text-decoration: none;
+        /* Sem realce próprio: o cabeçalho inteiro já é a área clicável, e um
+           fundo diferente no hover faria parecer que só o texto responde. */
+        opacity: .88;
+    }
+
+/* Seta fechada aponta para a direita; aberta, para baixo. A transição existe
+   para a mudança ser percebida como o mesmo elemento girando, e não como um
+   ícone trocado por outro. */
+.bi-agro .seta-collapse {
+    /* rotate(0deg) explícito, e não a ausência de transform: sair de "none"
+       para "rotate(90deg)" deixa o navegador inferir a matriz de partida, e a
+       transição fica menos previsível do que entre dois ângulos declarados. */
+    transform: rotate(0deg);
+    transition: transform .2s ease;
+    font-size: .8rem;
+    opacity: .8;
+}
+
+.bi-agro [aria-expanded="true"] .seta-collapse {
+    transform: rotate(90deg);
+}

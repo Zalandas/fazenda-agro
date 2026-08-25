@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120" role="img" aria-label="Agro BI — demonstração">
+  <title>Agro BI — demonstração</title>
+
+  <!-- Marca genérica, feita para este repositório público: nenhuma empresa real
+       é identificada aqui. As cores são as do design system que a tela já usa
+       (verde 700 e 500), para o cabeçalho não destoar. -->
+
+  <!-- Talhão visto de cima: três faixas de plantio em perspectiva. -->
+  <g fill="none" stroke="#146c43" stroke-width="7" stroke-linecap="round">
+    <path d="M26 84 C 44 62, 62 62, 80 84" />
+    <path d="M26 68 C 44 46, 62 46, 80 68" />
+    <path d="M26 52 C 44 30, 62 30, 80 52" />
+  </g>
+
+  <!-- Barras: a leitura de BI sobre o campo. -->
+  <g fill="#27a366">
+    <rect x="96"  y="62" width="11" height="26" rx="3" />
+    <rect x="112" y="48" width="11" height="40" rx="3" />
+    <rect x="128" y="34" width="11" height="54" rx="3" />
+  </g>
+
+  <text x="160" y="62"
+        font-family="Sora, 'Segoe UI', system-ui, sans-serif"
+        font-size="34" font-weight="700" fill="#0b3d2c" letter-spacing="0.5">AGRO BI</text>
+
+  <text x="161" y="86"
+        font-family="Inter, 'Segoe UI', system-ui, sans-serif"
+        font-size="15" font-weight="500" fill="#6b7f72" letter-spacing="3.2">DEMONSTRAÇÃO</text>
+</svg>

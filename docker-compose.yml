@@ -1,0 +1,30 @@
+# MySQL com o esquema mínimo e a fazenda fictícia, prontos na subida.
+#
+# Os arquivos de banco/ rodam em ordem alfabética na PRIMEIRA subida — se
+# você mexer neles depois, precisa derrubar o volume:
+#     docker compose down -v && docker compose up -d
+#
+# A porta 3307 (e não 3306) é para não brigar com um MySQL que já exista
+# na máquina.
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: ceodemo-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: demo
+      MYSQL_DATABASE: erp_demo
+      MYSQL_USER: demo
+      MYSQL_PASSWORD: demo
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./banco:/docker-entrypoint-initdb.d:ro
+      - dados:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pdemo"]
+      interval: 5s
+      retries: 20
+
+volumes:
+  dados:
