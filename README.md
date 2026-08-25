@@ -1,8 +1,8 @@
 # BI agrícola — demonstração
 
-Três telas de BI agrícola — **Produção**, **Contratos de venda** e **Quadro de Safras** — rodando
-contra um banco de dados **fictício**, com as mesmas consultas e as mesmas regras de cálculo do
-sistema em produção.
+As quatro telas de BI agrícola do portal — **Produção**, **Contratos de venda**, **Insumos** e
+**Quadro de Safras** — rodando contra um banco de dados **fictício**, com as mesmas consultas e as
+mesmas regras de cálculo do sistema em produção.
 
 ```
 docker compose up -d          # MySQL com o esquema e a fazenda de exemplo
@@ -127,13 +127,29 @@ O quadro também mostra por que **braquiária fica fora por padrão**. É pastag
 consome R$ 60 mil de custo e não produz saca nenhuma. Marcando o checkbox, a receita bruta não
 muda em um centavo e a margem operacional cai de **158,4% para 146,5%**.
 
+### E em insumos
+
+A tela responde "quanto a lavoura pagou de insumo, em sacas". O talhão **T-01** existe para
+exercitar as três regras de uma vez: ele tem soja e milho na mesma safra.
+
+| A regra | Se cair, o T-01 mostra |
+|---|---|
+| converter pelo preço da **própria cultura** | 23,79 sc/ha em vez de **31,01** — 23% a menos, no talhão mais caro |
+| dividir pela área **plantada** (200 ha), não a física (100) | R$ 5.700/ha em vez de **2.850,00** — o dobro |
+| trocar sobre a produtividade **colhida** | a relação de troca deixa de ser 36,49% |
+
+A braquiária exercita o resto do caminho: sem contrato, ela não tem preço próprio, e o custo em
+sacas cai no preço **geral** da safra — `(1.197.840 + 354.000) ÷ 15.000 = 103,456 R$/sc`. A
+relação de troca dela é 0%: não há colheita para trocar.
+
 ---
 
 ## O que este projeto NÃO é
 
-**Não é o sistema.** São três telas dele, com dados inventados. O sistema real sincroniza vários
-clientes, resolve escopo por grupo e empresa, controla acesso, e o portal tem uma quarta tela
-mais todo um lado financeiro. Nada disso está aqui.
+**Não é o sistema.** É o portal dele, com dados inventados. O sistema real sincroniza vários
+clientes, resolve escopo por grupo e empresa, controla acesso, gera e revoga os links, e tem
+todo um lado financeiro — integração com a Conta Azul, fluxo de caixa, plano de contas. Nada
+disso está aqui.
 
 **Não é um dashboard de exemplo.** A consulta e o pós-processamento são cópia literal do que
 roda em produção, sem simplificação. Uma versão enxuta seria mais fácil de ler e não provaria
@@ -159,9 +175,10 @@ banco/
   05-conferencia-contratos.sql a consulta de Contratos
   06-dados-quadro.sql          custo, faturamento e a simulação projetada
   07-conferencia-quadro.sql    as duas consultas do Quadro de Safras
+  08-conferencia-insumos.sql   o dado bruto de Insumos (o cálculo é em C#)
 CeoDemoAgro/
   Controllers/          as actions, cópia das que estão em produção
-  Services/             o cálculo do preço médio, cópia
+  Services/             preço médio e o BI de Insumos, cópia
   Views/Publico/        as telas, cópia
   Views/Shared/         o layout do portal, cópia
 docker-compose.yml      MySQL 8 na porta 3307, seed na primeira subida
@@ -172,16 +189,29 @@ O esquema é **um arquivo só** porque as telas compartilham tabelas: `safra`, `
 Produção é colheita, nos Contratos é entrega —, e separar o esquema por tela obrigaria a
 decidir de quem ele é.
 
-São **duas** as diferenças em relação ao sistema real, e só duas.
+São **três** as diferenças em relação ao sistema real, e vale enumerá-las porque a fidelidade é
+o argumento deste repositório.
 
-A primeira é de onde vem a string de conexão. Em produção o token está numa tabela e leva a um
+**1. De onde vem a string de conexão.** Em produção o token está numa tabela e leva a um
 identificador de grupo, que nomeia a string `ClienteConnection_{id}`. Aqui o token e o grupo
 estão no `appsettings.json`, e o resto do caminho é o mesmo — inclusive o nome da string.
 
-A segunda vale só para o Quadro de Safras: as tabelas de simulação (o "Projetado") vivem, em
-produção, no SQL Server do sistema, porque são trabalho da consultoria e não dado do ERP. Aqui
-estão no mesmo MySQL, para o demo não exigir dois bancos — muda o tipo da conexão e o
-`'%' + @cliente + '%'` do SQL Server, que em MySQL é `CONCAT`.
+**2. Onde moram as simulações** (só no Quadro de Safras). O "Projetado" vive, em produção, no
+SQL Server do sistema, porque é trabalho da consultoria e não dado do ERP. Aqui está no mesmo
+MySQL, para o demo não exigir dois bancos — muda o tipo da conexão e o `'%' + @cliente + '%'`
+do SQL Server, que em MySQL é `CONCAT`.
+
+**3. Um filtro que ficou de fora** (só em Insumos). O original esconde a categoria
+`INSUMOS CORRETIVO` de todo o BI — um filtro temporário, posto para uma apresentação e marcado
+para sair depois. Não veio junto, e a razão é o próprio propósito deste repositório: ele suprime
+dado **em silêncio**, fazendo o custo por hectare aparecer menor do que é, sem nada na tela
+dizendo isso. Em produção, com quem o pôs por perto, é uma decisão reversível; aqui seria uma
+regra escondida que o leitor não teria como descobrir.
+
+Há ainda uma troca sem efeito sobre número nenhum: uma chamada de log do Serilog virou escrita
+no `stderr`, para o demo não carregar a dependência inteira por uma linha. O aviso continua
+existindo — engoli-lo faria a tela mostrar custo em sacas calculado sobre o preço de último
+recurso, sem dizer.
 
 Fora isso, o corpo das actions não tem uma linha alterada.
 

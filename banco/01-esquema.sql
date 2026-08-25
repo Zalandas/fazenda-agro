@@ -10,15 +10,16 @@
 --  como está. Renomeá-los obrigaria a bifurcar o SQL, que é justamente
 --  o que este demo existe para não fazer.
 --
---  Duas telas hoje, e elas COMPARTILHAM tabelas: safra, produto e
---  romaneio servem às duas. É por isso que o esquema é um arquivo só —
---  separar por tela obrigaria a decidir de quem é o `romaneio`, que na
---  Produção é colheita e nos Contratos é entrega.
+--  As telas COMPARTILHAM tabelas, e é por isso que o esquema é um arquivo
+--  só: separar por tela obrigaria a decidir de quem é cada uma. O
+--  `romaneio` na Produção é colheita e nos Contratos é entrega; a
+--  `aplictalhao` no Quadro é custo por cultura e em Insumos é item a item.
+--  A mesma linha, lida de dois jeitos.
 -- =====================================================================
 
 SET NAMES utf8mb4;
 
-DROP TABLE IF EXISTS romaneio, configsafra, talhao, unidadepessoa, ciclo, produto, safra,
+DROP TABLE IF EXISTS tipoproduto, subtipoproduto, romaneio, configsafra, talhao, unidadepessoa, ciclo, produto, safra,
                      contrato, tipocontrato, pessoa, moeda, fixacoescontrato, parcelacontrato,
                      aplictalhao, itensaplictalhao, documento, tipooperacao, parceladocumento,
                      baixa, itensbaixa, cotacaomoeda,
@@ -51,11 +52,30 @@ CREATE TABLE ciclo (
     nomeCiclo  VARCHAR(60) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Cultura e cultivar saem da MESMA tabela; o que as separa é a coluna do
--- configsafra que aponta para cada uma.
+-- Cultura, cultivar e INSUMO saem todos da MESMA tabela; o que os separa é
+-- quem aponta para eles. Cultura e cultivar vêm das colunas do configsafra;
+-- insumo, do item da aplicação. Por isso cultura não tem tipo: as duas
+-- colunas de tipo abaixo só valem para insumo.
 CREATE TABLE produto (
-    codProduto   INT PRIMARY KEY,
-    nomeProduto  VARCHAR(120) NOT NULL
+    codProduto            INT PRIMARY KEY,
+    nomeProduto           VARCHAR(120) NOT NULL,
+    codTipoProd           INT          NULL,
+    codSubTipoProdutoTP   INT          NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- A CATEGORIA do insumo no BI sai de um CASE sobre estes dois nomes, e a
+-- ORDEM das cláusulas importa: '%DEFENSIVO%' no tipo é testado ANTES de
+-- herbicida e inseticida, então defensivo com subtipo herbicida cairia em
+-- FUNGICIDAS. Na base real os herbicidas têm tipo próprio; o seed reproduz
+-- isso, e é por isso que ele funciona.
+CREATE TABLE tipoproduto (
+    codTipoProd    INT PRIMARY KEY,
+    nomeTipoProd   VARCHAR(80) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE subtipoproduto (
+    codSubtipoProd    INT PRIMARY KEY,
+    nomeSubtipoProd   VARCHAR(80) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- O PLANTIO: uma linha por (safra, fazenda, talhão, cultura, cultivar, ciclo).
@@ -176,16 +196,24 @@ CREATE TABLE parcelacontrato (
 --  faturamento (notas e baixas) de que sai o PREÇO MÉDIO realizado.
 -- ---------------------------------------------------------------------
 
--- Custo: uma aplicação por (safra, cultura) com seus itens.
+-- A APLICAÇÃO: o que foi aplicado num talhão, para uma cultura, numa safra.
+-- Serve a DUAS telas, em graus diferentes — como o romaneio:
+--   Quadro de Safras — só o total por (safra, cultura), para o custo/ha;
+--   Insumos          — item a item, por talhão e por produto, para a matriz
+--                      de tipo de insumo x talhão.
 CREATE TABLE aplictalhao (
     codAplicTalhao     INT PRIMARY KEY,
     codSafra           INT NULL,
+    codTalhao          INT NULL,
     codProdutoCultura  INT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- codProduto aponta para o INSUMO (não para a cultura): é dele que sai o
+-- tipo/subtipo que o BI de Insumos agrupa.
 CREATE TABLE itensaplictalhao (
     codItAplicTalhao    INT PRIMARY KEY,
     codAplicTalhao      INT           NOT NULL,
+    codProduto          INT           NULL,
     valorItAplicTalhao  DECIMAL(16,2) NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

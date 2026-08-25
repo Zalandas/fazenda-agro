@@ -36,23 +36,87 @@ VALUES
   (1, 1, 4, 30, NULL, 1, 50.0000, 0);
 
 -- ---------------------------------------------------------------------
---  CUSTO DE PRODUÇÃO — aplicações por talhão, somadas por (safra, cultura)
+--  CUSTO DE PRODUÇÃO — as aplicações por talhão
+--
+--  Estas linhas servem a DUAS telas, em graus diferentes:
+--    Quadro de Safras — só o total por (safra, cultura), para o custo/ha;
+--    Insumos          — item a item, por talhão e por tipo de insumo.
+--
+--  Por isso a aplicação é por TALHÃO, e não uma por cultura: o Quadro
+--  soma tudo de qualquer forma, mas Insumos precisa saber onde foi
+--  gasto. Os totais por cultura ficam iguais aos de antes — 990.000 na
+--  soja, 250.000 no milho, 60.000 na braquiária —, então o Quadro não
+--  muda.
+--
+--  Os talhões têm custo/ha DIFERENTE de propósito: comparar talhão é
+--  justamente o que a tela de Insumos existe para fazer, e três valores
+--  iguais não mostrariam nada.
 -- ---------------------------------------------------------------------
-INSERT INTO aplictalhao (codAplicTalhao, codSafra, codProdutoCultura) VALUES
-  (1, 1, 10),   -- soja
-  (2, 1, 11),   -- milho
-  (3, 1, 30);   -- braquiária
 
-INSERT INTO itensaplictalhao (codItAplicTalhao, codAplicTalhao, valorItAplicTalhao) VALUES
-  -- SOJA: 990.000,00 em 330 ha = 3.000,00/ha
-  (1, 1, 420000.00),
-  (2, 1, 350000.00),
-  (3, 1, 220000.00),
-  -- MILHO: 250.000,00 em 100 ha = 2.500,00/ha
-  (4, 2, 150000.00),
-  (5, 2, 100000.00),
-  -- BRAQUIÁRIA: 60.000,00 em 50 ha = 1.200,00/ha, e nenhuma receita
-  (6, 3,  60000.00);
+-- Os INSUMOS. O tipo do herbicida e do inseticida NÃO é 'DEFENSIVO', e
+-- isso não é descuido: o CASE do BI testa '%DEFENSIVO%' ANTES de olhar
+-- herbicida e inseticida, então defensivo com subtipo herbicida cairia em
+-- FUNGICIDAS. Na base real eles têm tipo próprio.
+INSERT INTO tipoproduto (codTipoProd, nomeTipoProd) VALUES
+  (1, 'SEMENTES'),
+  (2, 'FERTILIZANTES'),
+  (3, 'AGROQUIMICOS');
+
+INSERT INTO subtipoproduto (codSubtipoProd, nomeSubtipoProd) VALUES
+  (1, 'SEMENTE TRATADA'),
+  (2, 'MACRONUTRIENTE'),
+  (3, 'FUNGICIDA'),
+  (4, 'HERBICIDA'),
+  (5, 'INSETICIDA');
+
+INSERT INTO produto (codProduto, nomeProduto, codTipoProd, codSubTipoProdutoTP) VALUES
+  (40, 'Semente Soja Tratada',   1, 1),
+  (41, 'Semente Milho Tratada',  1, 1),
+  (42, 'Semente Braquiaria',     1, 1),
+  (43, 'Adubo Formulado NPK',    2, 2),
+  (44, 'Calcario Dolomitico',    2, 2),
+  (45, 'Fungicida Triazol',      3, 3),
+  (46, 'Herbicida Glifosato',    3, 4),
+  (47, 'Inseticida Piretroide',  3, 5);
+
+INSERT INTO aplictalhao (codAplicTalhao, codSafra, codTalhao, codProdutoCultura) VALUES
+  (1, 1, 1, 10),   -- T-01 soja       100 ha
+  (2, 1, 2, 10),   -- T-02 soja       150 ha
+  (3, 1, 3, 10),   -- T-03 soja        80 ha
+  (4, 1, 1, 11),   -- T-01 milho      100 ha (2a safra, mesmo talhão)
+  (5, 1, 4, 30);   -- T-04 braquiária  50 ha
+
+INSERT INTO itensaplictalhao (codItAplicTalhao, codAplicTalhao, codProduto, valorItAplicTalhao) VALUES
+  -- T-01 SOJA — 320.000,00 em 100 ha = 3.200,00/ha (o mais caro)
+  ( 1, 1, 40,  60000.00),
+  ( 2, 1, 43, 100000.00),
+  ( 3, 1, 44,  40000.00),
+  ( 4, 1, 46,  45000.00),
+  ( 5, 1, 45,  55000.00),
+  ( 6, 1, 47,  20000.00),
+  -- T-02 SOJA — 420.000,00 em 150 ha = 2.800,00/ha (o mais barato)
+  ( 7, 2, 40,  85000.00),
+  ( 8, 2, 43, 140000.00),
+  ( 9, 2, 44,  40000.00),
+  (10, 2, 46,  60000.00),
+  (11, 2, 45,  70000.00),
+  (12, 2, 47,  25000.00),
+  -- T-03 SOJA — 250.000,00 em 80 ha = 3.125,00/ha
+  (13, 3, 40,  48000.00),
+  (14, 3, 43,  90000.00),
+  (15, 3, 44,  20000.00),
+  (16, 3, 46,  36000.00),
+  (17, 3, 45,  42000.00),
+  (18, 3, 47,  14000.00),
+  -- T-01 MILHO — 250.000,00 em 100 ha = 2.500,00/ha
+  (19, 4, 41,  70000.00),
+  (20, 4, 43, 120000.00),
+  (21, 4, 46,  30000.00),
+  (22, 4, 45,  20000.00),
+  (23, 4, 47,  10000.00),
+  -- T-04 BRAQUIÁRIA — 60.000,00 em 50 ha = 1.200,00/ha, e nenhuma receita
+  (24, 5, 42,  25000.00),
+  (25, 5, 43,  35000.00);
 
 -- ---------------------------------------------------------------------
 --  FATURAMENTO — de onde sai o PREÇO MÉDIO realizado
@@ -187,4 +251,39 @@ VALUES
 --    colhida menor que 330 → a regra da faixa de cultivar mudou.
 --  Braquiária aparecendo
 --    sem marcar o checkbox → o filtro caiu; a margem cai 12 pontos.
+--
+--  =====================================================================
+--  E O QUE A TELA DE INSUMOS FAZ COM ESTAS MESMAS APLICAÇÕES
+--
+--  A matriz é tipo de insumo x talhão. O T-01 é o talhão que importa: ele
+--  tem SOJA e MILHO na mesma safra, e é onde as três regras aparecem.
+--
+--    TALHÃO   ÁREA      R$/HA       SC/HA    TROCA
+--    T-01     200,0 ha  2.850,00    31,01    36,49%
+--    T-02     150,0 ha  2.800,00    23,38    37,10%
+--    T-03      80,0 ha  3.125,00    26,09    43,48%
+--    T-04      50,0 ha  1.200,00    11,60     0,00%
+--
+--    KPIs   R$ 1.300.000,00 aplicados · R$ 2.708,33/ha · 25,78 sc/ha ·
+--           troca média 35,48%
+--
+--  AS TRÊS REGRAS, E O QUE CADA UMA CUSTA SE CAIR
+--
+--  1) O custo em sacas converte pelo preço da PRÓPRIA cultura. No T-01 são
+--     320.000 de soja a 119,784 mais 250.000 de milho a 70,80. Com um preço
+--     único a coluna daria 23,79 sc/ha em vez de 31,01 — 23% a menos, e
+--     justamente no talhão mais caro.
+--
+--  2) O R$/ha divide pela área PLANTADA (200 ha = 100 de soja + 100 de
+--     milho), não pela área FÍSICA do talhão (100 ha). Com a física daria
+--     5.700,00/ha: o DOBRO, porque a área contaria uma vez e o custo das
+--     duas culturas.
+--
+--  3) A troca usa a produtividade COLHIDA. No T-01 são 17.000 sc em 200 ha
+--     = 85 sc/ha, e 31,01 ÷ 85 = 36,49%.
+--
+--  A BRAQUIÁRIA exercita o fallback: não tem contrato, então não tem preço
+--  próprio, e o custo em sacas cai no preço GERAL da safra —
+--  (1.197.840 + 354.000) ÷ 15.000 = 103,456 R$/sc, que dá 11,60 sc/ha. A
+--  troca dela é 0%: não há colheita para trocar.
 -- =====================================================================

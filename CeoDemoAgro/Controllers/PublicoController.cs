@@ -602,6 +602,54 @@ namespace CeoDemoAgro.Controllers
         }
 
         /// <summary>
+        /// O BI de Insumos: quanto custou cada tipo de insumo, talhão a talhão, e — a leitura
+        /// que a diretoria de fato usa — quanto disso a lavoura pagou em SACAS.
+        ///
+        /// Três regras de cálculo carregam o sentido da tela, e todas já erraram em produção:
+        ///
+        /// <list type="bullet">
+        /// <item>o custo em sacas converte pelo preço da PRÓPRIA cultura da aplicação — o
+        /// insumo do milho pelo preço do milho, não por um preço geral da safra;</item>
+        /// <item>o R$/ha divide pela área PLANTADA daquela cultura, não pela área física do
+        /// talhão. Com a física, talhão que teve safra e safrinha contava a área uma vez e o
+        /// custo das duas, dobrando o número;</item>
+        /// <item>a relação de troca usa a produtividade COLHIDA (Σsacas ÷ Σárea), nunca média
+        /// de produtividades.</item>
+        /// </list>
+        ///
+        /// Como nas outras telas, só a resolução do token muda. O serviço é o mesmo — e é
+        /// serviço, e não código no controller, porque as telas interna e pública do sistema
+        /// real eram duas cópias de ~280 linhas: foi assim que a relação de troca da pública
+        /// zerou uma vez, quando um alias de SQL mudou só num lado.
+        /// </summary>
+        [HttpGet("p/insumos/{token}")]
+        public async Task<IActionResult> Insumos(string token, string safra = "2024/2025",
+            string fazenda = "", string cultura = "")
+        {
+            var (ok, connString, nomeCliente) = ResolverToken(token);
+            if (!ok)
+                return Content("Este link é inválido ou foi desativado pelo administrador.");
+
+            ViewBag.NomeCliente = nomeCliente;
+            ViewBag.Token = token;
+
+            var r = await InsumosService.GerarAsync(
+                connString, safra, fazenda, cultura,
+                dataInicialMinima: "2000-01-01",
+                safrasDaTabelaSafra: false);
+
+            ViewBag.ErroBanco = r.ErroBanco;
+            ViewBag.SafrasDisponiveis = r.SafrasDisponiveis;
+            ViewBag.FazendasDisponiveis = r.FazendasDisponiveis;
+            ViewBag.CulturasDisponiveis = r.CulturasDisponiveis;
+            ViewBag.SafraSelecionada = safra;
+            ViewBag.FazendaSelecionada = fazenda;
+            ViewBag.CulturaSelecionada = cultura;
+
+            return View(r.Model);
+        }
+
+        /// <summary>
         /// Braquiária é PASTAGEM, não lavoura: entra na área plantada do ERP mas não tem
         /// colheita de grão, e deixá-la no quadro derruba a produtividade média de tudo. Fica
         /// fora por padrão, com um checkbox para reexibir.
